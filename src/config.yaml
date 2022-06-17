@@ -1,0 +1,11 @@
+iso3: eth
+codab:
+  hdx_dataset_name: eth_adm_csa_bofedb_2021_SHP.zip
+  layer_base_name: eth_admbnda_adm{admin_level}_csa_bofedb_2021.shp
+  admin_level_max: 3
+  custom_layer_names:
+    - eth_admbnda_adm0_csa_bofedb_itos_2021
+# fewsnet:
+#   region_name: east-africa
+usgs_ndvi:
+  area_name: east-africa
