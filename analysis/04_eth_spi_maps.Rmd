@@ -1,0 +1,154 @@
+---
+title: "SPIVisualision"
+author: "Pauline"
+date: '2022-06-27'
+output: html_document
+---
+
+```{r}
+### R Script for Extracting SPI values by Admin Level 3 For Ethiopia
+
+## libraries
+library(tidyverse)
+library(lubridate)
+library(ncdf4)
+library(sf)
+
+# data inputs
+filePath <- paste0(Sys.getenv("AA_DATA_DIR"), "/public/raw/eth/chirps/")
+ethSF <- st_read(paste0(Sys.getenv("AA_DATA_DIR"), "/public/raw/eth/cod_ab/eth_adm_csa_bofedb_2021_shp"), 
+                 layer = "eth_admbnda_adm3_csa_bofedb_2021")
+adm3intersectionICPAC <- read_csv(paste0(Sys.getenv("AA_DATA_DIR"), 
+                                         "/public/exploration/eth/adm3intersectionICPAC.csv"))
+ncObj <- nc_open(paste0(Sys.getenv("AA_DATA_DIR"), "/public/raw/eth/spi/precSPI_JAS2021Ethiopia.nc"))
+ncObj2 <- nc_open(paste0(Sys.getenv("AA_DATA_DIR"), "/public/raw/eth/spi/precSPI_MAM2022Ethiopia.nc"))
+adm3LHZ <- read_csv(paste0(Sys.getenv("AA_DATA_DIR"), 
+                           "/public/exploration/eth/usgs_ndvi/eth_adm3_pastoral.csv"))
+pastSF <- st_read(paste0(Sys.getenv("AA_DATA_DIR"), 
+                         "/public/exploration/eth/ET_LHZ_2009/ET_LHZ_2009.shp")) %>%
+    filter(LZTYPE %in% c("Agropastoral", "Pastoral"))
+pastSF <- st_transform(pastSF, crs = 4326)
+
+
+```
+
+
+```{r}
+
+# checking names in file
+names(ncObj$var)
+
+# function for extracting the SPI data and making a long DF
+SPIObj <- function(ncObj){
+    SPIObj <- ncvar_get(ncObj, "spi") %>%
+        data.frame() %>%
+        bind_cols(round(ncvar_get(ncObj, "lon"), 3)) %>%
+        setNames(c(round(ncvar_get(ncObj, "lat"), 3), "Longitude")) %>%
+        gather(key = "Latitude", value = "spi", -Longitude) %>%
+        mutate(Centroid = paste0(Longitude, "E_", Latitude, "N"))
+    SPIObj <- SPIObj[!is.na(SPIObj$spi),]
+    
+    return(SPIObj)
+}
+# function for summarising grids to admin 3
+grid2adm3 <- function(intersectObj, SPIObj){
+    adm3Grids <- intersectObj %>%
+        mutate(Centroid = paste0(CentLon, "E_", CentLat, "N")) %>%
+        left_join(SPIObj, by = "Centroid") %>%
+        group_by(ADM1_EN, ADM2_EN, ADM3_EN, ADM3_PCODE) %>%
+        summarise(spi = mean(spi, na.rm = T)) %>%
+        left_join(adm3LHZ, by = "ADM3_PCODE")
+    return(adm3Grids)
+}
+# function for plotting 
+SPIPlot <- function(SFObj, title){
+    ggplot() + 
+        geom_sf(data = SFObj, aes(fill = spi)) + 
+        ggtitle(title) + 
+        labs(fill = "SPI") + 
+        xlab("Longitude") + 
+        ylab("Latitude") + 
+        theme(text = element_text(size = 15), legend.key.size = unit(1.2, 'cm')) + 
+        scale_fill_stepsn(colours = c("#ff0000", "#ff1900", "#ff4c00", "#ff7f00", "#ff9900", "#ffcc19", 
+                                      "#ffffff", "#ffffff", "#baffba", "#64f964", "#49b812", "#2a9c0a",
+                                      "#1d7407", "#325d32"),
+                          breaks = c(-3.5, -3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5),
+                          limit = c(-3.5, 3.5),
+                          na.value = "#BEBEBE")
+}
+# JAS Analysis
+JAS_SPI <- SPIObj(ncObj)
+JAS_SF <- st_as_sf(JAS_SPI, coords = c('Longitude', 'Latitude'))
+st_crs(JAS_SF) <- 4326
+ggplot(JAS_SF) + 
+    geom_sf(aes(color = spi))
+
+```
+
+```{r}
+# trying to create a grid intersection
+ICPACGrid <- st_sf(st_make_grid(ethSF, cellsize = 0.1, offset = c(20.45, -13.55), n = c(326, 381)))
+ggplot(data = ICPACGrid) + geom_sf()
+
+
+```
+
+```{r}
+# matching admin 3 to grid SPI values and summarizing
+adm3Grids <- grid2adm3(adm3intersectionICPAC, JAS_SPI)
+#write.csv(adm3Grids, paste0(Sys.getenv("AA_DATA_DIR"), 
+#                            "/public/exploration/eth/spi/JAS_2021_SPI_By_Admin3.csv"))
+ethSF2 <- ethSF %>%
+    left_join(adm3Grids, by = "ADM3_EN")
+jpeg(paste0(Sys.getenv("AA_DATA_DIR"), 
+            "/public/exploration/eth/spi/SPI-3 for JAS 2021_", Sys.Date(),".jpg"), width = 1100, height = 600)
+SPIPlot(ethSF2, title = "Admin Level 3 with 3 month SPI Values for July, August and September 2021")
+dev.off()
+
+```
+
+```{r}
+# Adding Pastoral Plot
+ethSF4 <- ethSF2 %>%
+    mutate(spi = ifelse(pastoral_lz, spi, NA))
+jpeg(paste0(Sys.getenv("AA_DATA_DIR"), 
+            "/public/exploration/eth/spi/SPI-3 for JAS 2021 for (Agro)Pastoral Zones_", Sys.Date(),".jpg"), 
+     width = 1100, height = 600)
+SPIPlot(ethSF4, title = "Admin Level 3 with 3 month SPI Values for July, August and September 2021 
+        for AgroPastoral and Pastoral Zones")
+dev.off()
+```
+
+```{r}
+# MAM Analysis
+names(ncObj2$var)
+MAM_SPI <- SPIObj(ncObj2)
+MAM_SF <- st_as_sf(MAM_SPI, coords = c('Longitude', 'Latitude'))
+st_crs(MAM_SF) <- 4326
+ggplot(MAM_SF) + 
+    geom_sf(aes(color = spi))
+adm3Grids2 <- grid2adm3(adm3intersectionICPAC, MAM_SPI)
+#write.csv(adm3Grids2,  paste0(Sys.getenv("AA_DATA_DIR"), 
+#                              "/public/exploration/eth/spi/MAM_2022_SPI_By_Admin3.csv"))
+ethSF3 <- ethSF %>%
+    left_join(adm3Grids2, by = "ADM3_EN")
+jpeg(paste0(Sys.getenv("AA_DATA_DIR"), 
+            "/public/exploration/eth/spi/SPI-3 for MAM 2022_", Sys.Date(),".jpg"), 
+     width = 1100, height = 600)
+SPIPlot(ethSF3, title = "Admin Level 3 with 3 month SPI Values for March, April and May 2022")
+dev.off()
+
+```
+
+```{r}
+# Adding Pastoral Plot
+ethSF5 <- ethSF3 %>%
+    mutate(spi = ifelse(pastoral_lz, spi, NA))
+jpeg(paste0(Sys.getenv("AA_DATA_DIR"), 
+            "/public/exploration/eth/spi/SPI-3 for MAM 2022 for (Agro)Pastoral Zones_", Sys.Date(),".jpg"), 
+     width = 1100, height = 600)
+SPIPlot(ethSF5, title = "Admin Level 3 with 3 month SPI Values for March, April and May 2022
+        for AgroPastoral and Pastoral Zones")
+dev.off()
+```
+
