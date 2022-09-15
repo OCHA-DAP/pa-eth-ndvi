@@ -96,12 +96,12 @@ ggplot(data = ICPACGrid) + geom_sf()
 ```{r}
 # matching admin 3 to grid SPI values and summarizing
 adm3Grids <- grid2adm3(adm3intersectionICPAC, JAS_SPI)
-write.csv(adm3Grids, paste0(Sys.getenv("AA_DATA_DIR"), 
-                            "/public/exploration/eth/spi/JAS_2021_SPI_By_Admin3.csv"))
+#write.csv(adm3Grids, paste0(Sys.getenv("AA_DATA_DIR"), 
+#                            "/public/exploration/eth/spi/JAS_2021_SPI_By_Admin3.csv"))
 ethSF2 <- ethSF %>%
     left_join(adm3Grids, by = "ADM3_EN")
 jpeg(paste0(Sys.getenv("AA_DATA_DIR"), 
-            "/public/exploration/eth/spi/SPI-3 for JAS 2021.jpg"), width = 1100, height = 600)
+            "/public/exploration/eth/spi/SPI-3 for JAS 2021_", Sys.Date(),".jpg"), width = 1100, height = 600)
 SPIPlot(ethSF2, title = "Admin Level 3 with 3 month SPI Values for July, August and September 2021")
 dev.off()
 
@@ -112,7 +112,7 @@ dev.off()
 ethSF4 <- ethSF2 %>%
     mutate(spi = ifelse(pastoral_lz, spi, NA))
 jpeg(paste0(Sys.getenv("AA_DATA_DIR"), 
-            "/public/exploration/eth/spi/SPI-3 for JAS 2021 for (Agro)Pastoral Zones.jpg"), 
+            "/public/exploration/eth/spi/SPI-3 for JAS 2021 for (Agro)Pastoral Zones_", Sys.Date(),".jpg"), 
      width = 1100, height = 600)
 SPIPlot(ethSF4, title = "Admin Level 3 with 3 month SPI Values for July, August and September 2021 
         for AgroPastoral and Pastoral Zones")
@@ -128,12 +128,12 @@ st_crs(MAM_SF) <- 4326
 ggplot(MAM_SF) + 
     geom_sf(aes(color = spi))
 adm3Grids2 <- grid2adm3(adm3intersectionICPAC, MAM_SPI)
-write.csv(adm3Grids2,  paste0(Sys.getenv("AA_DATA_DIR"), 
-                              "/public/exploration/eth/spi/MAM_2022_SPI_By_Admin3.csv"))
+#write.csv(adm3Grids2,  paste0(Sys.getenv("AA_DATA_DIR"), 
+#                              "/public/exploration/eth/spi/MAM_2022_SPI_By_Admin3.csv"))
 ethSF3 <- ethSF %>%
     left_join(adm3Grids2, by = "ADM3_EN")
 jpeg(paste0(Sys.getenv("AA_DATA_DIR"), 
-            "/public/exploration/eth/spi/SPI-3 for MAM 2022.jpg"), 
+            "/public/exploration/eth/spi/SPI-3 for MAM 2022_", Sys.Date(),".jpg"), 
      width = 1100, height = 600)
 SPIPlot(ethSF3, title = "Admin Level 3 with 3 month SPI Values for March, April and May 2022")
 dev.off()
@@ -145,7 +145,7 @@ dev.off()
 ethSF5 <- ethSF3 %>%
     mutate(spi = ifelse(pastoral_lz, spi, NA))
 jpeg(paste0(Sys.getenv("AA_DATA_DIR"), 
-            "/public/exploration/eth/spi/SPI-3 for MAM 2022 for (Agro)Pastoral Zones.jpg"), 
+            "/public/exploration/eth/spi/SPI-3 for MAM 2022 for (Agro)Pastoral Zones_", Sys.Date(),".jpg"), 
      width = 1100, height = 600)
 SPIPlot(ethSF5, title = "Admin Level 3 with 3 month SPI Values for March, April and May 2022
         for AgroPastoral and Pastoral Zones")
