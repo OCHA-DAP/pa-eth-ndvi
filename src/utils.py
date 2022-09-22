@@ -90,7 +90,31 @@ def aggregate_admin(start_date, end_date, gdf, feature_col):
 
     return gdf_stats
 
-
+def plt_ndvi_dates(gdf_stats, data_col, colp_num=3, caption=None):
+    num_plots = len(gdf_stats.date.unique())
+    if num_plots == 1:
+        colp_num = 1
+    rows = math.ceil(num_plots / colp_num)
+    position = range(1, num_plots + 1)
+    fig = plt.figure(figsize=(10 * colp_num, 10 * rows))
+    for i, d in enumerate(gdf_stats.date.unique()):
+        ax = fig.add_subplot(rows, colp_num, i + 1)
+        gdf_stats[gdf_stats.date == d].plot(
+            ax=ax,
+            column=data_col,
+            legend=True,
+            categorical=True,
+            cmap=ListedColormap(constants.ndvi_colors),
+        )
+        ax.set_title(
+            f"{pd.to_datetime(str(d)).strftime('%d-%m-%Y')} till "
+            f"{(pd.to_datetime(str(d))+relativedelta(days=9)).strftime('%d-%m-%Y')}"
+        )
+        ax.axis("off")
+    if caption:
+        plt.figtext(0.7, 0.2, caption)
+    plt.suptitle("Percent of median NDVI", size=24, y=0.9)
+    return fig
 
 def compute_dekads_below_thresh(
     gdf, pcode_col, value_col, perc_bins, perc_labels, threshold=80
