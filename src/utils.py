@@ -50,7 +50,7 @@ def retrieve_raster_data(start_date, end_date, gdf, save_file=False):
 # to look into the cause of that and then switch
 # even with 10x faster, this takes super long to compute due to huge file sizes
 # and many adm3s!
-def aggregate_admin(start_date, end_date, gdf, feature_col):
+def aggregate_admin(start_date, end_date, gdf, feature_col,save_file=False):
     # assuming all dates in between are present in the file
     aggregated_filepath = (
         constants.ndvi_exploration_dir
@@ -75,7 +75,6 @@ def aggregate_admin(start_date, end_date, gdf, feature_col):
             stats_list=stats_list,
             all_touched=False,
         )
-        
         df_stats["mean_binned"] = pd.cut(df_stats[f"mean"], constants.ndvi_bins)
         df_stats["median_binned"] = pd.cut(df_stats[f"median"], constants.ndvi_bins)
         df_stats["mean_binned_str"] = pd.cut(
@@ -84,7 +83,8 @@ def aggregate_admin(start_date, end_date, gdf, feature_col):
         df_stats["median_binned_str"] = pd.cut(
             df_stats[f"median"], constants.ndvi_bins, labels=constants.ndvi_labels
         )
-        df_stats.to_csv(aggregated_filepath)
+        if save_file: 
+            df_stats.to_csv(aggregated_filepath)
 
     gdf_stats = gdf[[feature_col, "geometry"]].merge(df_stats, on=feature_col)
 
