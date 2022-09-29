@@ -34,12 +34,10 @@ from src.constants import (
     perc_bins,
     perc_labels,
     threshold,
-    ndvi_exploration_dir,
 )
 
 from src.utils import (
     retrieve_raster_data,
-    get_plot_dir,
     aggregate_admin,
     compute_dekads_below_thresh,
     clip_lz,
@@ -53,20 +51,20 @@ from src.utils import (
 
 ```py3
 # load admin boundaries
-# codab = CodAB(country_config=country_config)
-# gdf_adm3 = codab.load(admin_level=3)
+codab = CodAB(country_config=country_config)
+gdf_adm3 = codab.load(admin_level=3)
 pcode3_col = "ADM3_PCODE"
 ```
 
 Adding these lines as on Windows, there may be a problem that was resolved earlier in the year on reading of zipped shapefiles which may not have been applied to the branch of the toolbox being used.
 
 ```py3
-filename3 = (
-    "zip://"
-    + os.getenv("AA_DATA_DIR")
-    + "/public/raw/eth/cod_ab/eth_cod_ab.shp.zip/eth_admbnda_adm3_csa_bofedb_2021.shp"
-)
-gdf_adm3 = gpd.read_file(filename3)
+# filename3 = (
+#    "zip://"
+#    + os.getenv("AA_DATA_DIR")
+#    + "/public/raw/eth/cod_ab/eth_cod_ab.shp.zip/eth_admbnda_adm3_csa_bofedb_2021.shp"
+#)
+#gdf_adm3 = gpd.read_file(filename3)
 ```
 
 ##### Setting start and end date of analysis
