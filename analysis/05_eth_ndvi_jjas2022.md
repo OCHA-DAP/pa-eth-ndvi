@@ -133,10 +133,6 @@ gdf_stats_adm3 = aggregate_admin(
 ```
 
 ```py3
-gdf_stats_adm3
-```
-
-```py3
 # I really have no clue why but basically have to recreate the
 # column to be able to plot
 # maybe smth with variable being of type category, but even just changing
