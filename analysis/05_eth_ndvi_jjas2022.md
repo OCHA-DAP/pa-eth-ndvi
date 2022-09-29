@@ -190,4 +190,4 @@ g = plot_ndvi_aggr(
 )
 ```
 
-From the analysis of the JJAS 2022 season, 
+From the analysis of the JJAS 2022 season, most of the agropastoral regions experienced vegetation conditions close to the median except for a few admin3s.
