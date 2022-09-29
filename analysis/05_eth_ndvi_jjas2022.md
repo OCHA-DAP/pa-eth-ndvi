@@ -132,6 +132,12 @@ gdf_stats_adm3 = aggregate_admin(
 )
 ```
 
+Checking if file values for one admin 3 region
+
+```py3
+gdf_stats_adm3[gdf_stats_adm3["ADM3_PCODE"] == "ET160037"]
+```
+
 ```py3
 # I really have no clue why but basically have to recreate the
 # column to be able to plot
@@ -183,3 +189,5 @@ g = plot_ndvi_aggr(
     title=f"Percentage of dekads Jun-Sep 2022 NDVI \n was <={threshold}% of median NDVI",
 )
 ```
+
+From the analysis of the JJAS 2022 season, 
