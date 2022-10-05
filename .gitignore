@@ -136,3 +136,5 @@ dmypy.json
 
 # Notebooks
 *.ipynb
+.Rproj.user
+.Rhistory
