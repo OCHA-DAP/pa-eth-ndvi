@@ -7,6 +7,7 @@ using the percent of median data found [here](https://edcintl.cr.usgs.gov/downlo
 
 
 
+
 ```python
 %load_ext autoreload
 %autoreload 2
@@ -15,13 +16,14 @@ using the percent of median data found [here](https://edcintl.cr.usgs.gov/downlo
 from matplotlib.colors import ListedColormap
 import pandas as pd
 import matplotlib.pyplot as plt
-# import geopandas as gpd
+import geopandas as gpd
 import os
 
 from datetime import date
 ```
 
 ##### Importing required functions
+
 
 
 ```python
@@ -53,37 +55,41 @@ from src.utils import (
 ##### Loading Admin Boundaries
 
 
+
 ```python
 # load admin boundaries
-codab = CodAB(country_config=country_config)
-gdf_adm3 = codab.load(admin_level=3)
-pcode3_col = "ADM3_PCODE"
+# codab = CodAB(country_config=country_config)
+# gdf_adm3 = codab.load(admin_level=3)
+# pcode3_col = "ADM3_PCODE"
 ```
 
 Adding these lines as on Windows, there may be a problem that was resolved earlier in the year on reading of zipped shapefiles which may not have been applied to the branch of the toolbox being used.
 
 
+
 ```python
-#filename3 = (
-#    "zip://"
-#    + os.getenv("AA_DATA_DIR")
-#    + "/public/raw/eth/cod_ab/eth_cod_ab.shp.zip/eth_admbnda_adm3_csa_bofedb_2021.shp"
-#)
-#gdf_adm3 = gpd.read_file(filename3)
+filename3 = (
+    "zip://"
+    + os.getenv("AA_DATA_DIR")
+    + "/public/raw/eth/cod_ab/eth_cod_ab.shp.zip/eth_admbnda_adm3_csa_bofedb_2021.shp"
+)
+gdf_adm3 = gpd.read_file(filename3)
 ```
 
 ##### Setting start and end date of analysis
 Note: The start date is the first date of the first dekad to be analysed. The end date is the first date of the last dekad to be used in the analysis.
 
 
+
 ```python
 # define start and end of season
 start_date = date(day=1, month=6, year=2022)
-end_date = date(day=11, month=9, year=2022)
+end_date = date(day=21, month=9, year=2022)
 ```
 
 ##### Getting raster data
-The following section will take some time the first time it is run since it has to download the NDVI raster. Ensure the internet connection is stable during the initial download to reduce chances of IncompleteRead Errors. Once the download is done, the code reads the data and will not take so much time. If having problems running this, download the raster files, extract the .tif file and rename it using the naming scheme eaYYYY_PPpct, where YYYY is the 4-digit year and PP is the 2-digit pentad of the year (01-72). Add the file to the folder `\public\raw\glb\usgs_ndvi`.
+The following section will take some time the first time it is run since it has to download the NDVI raster. Ensure the internet connection is stable during the initial download to reduce chances of IncompleteRead Errors. Once the download is done, the code reads the data and will not take so much time. 
+
 
 
 ```python
@@ -109,13 +115,14 @@ raster_jjas = raster_jjas.where(raster_jjas != 255)
 Plotting the first dekads of June, July, August and September.
 
 
+
 ```python
 # plot first dekads of each month
 raster_jjas.sel(date=raster_jjas.date.dt.day == 1).plot.imshow(
     col="date",
     levels=ndvi_bins,
     cmap=ListedColormap(ndvi_colors),
-    figsize=(40, 10),
+    figsize=(24, 6),
     cbar_kwargs={
         "orientation": "horizontal",
         "shrink": 0.8,
@@ -128,6 +135,7 @@ raster_jjas.sel(date=raster_jjas.date.dt.day == 1).plot.imshow(
 
 ##### Computing stats and aggregating to admin3
 If running for the first time, set save_file argument to True to save output to a file. Remove argument or set to False otherwise. Takes ~30 minutes.
+
 
 
 ```python
@@ -143,7 +151,20 @@ gdf_stats_adm3 = aggregate_admin(
 
 
 ```python
-gdf_stats_adm3[gdf_stats_adm3["ADM3_PCODE"] == "ET160037"]
+gdf_stats_adm3
+```
+
+
+```python
+gdf_stats_adm3["month"] = pd.to_datetime(gdf_stats_adm3["date"]).dt.month
+gdf_stats_adm3["below_80"] = gdf_stats_adm3["median"] <= 80
+gdf_stats_adm3.groupby(["below_80", "month"])["below_80"].count()
+```
+
+
+```python
+gdf_stats_adm3["above_95"] = gdf_stats_adm3["median"] >= 95
+gdf_stats_adm3.groupby(["above_95", "month"])["above_95"].count()
 ```
 
 
@@ -195,6 +216,28 @@ gdf_stats_mask = clip_lz(
     lztype=["Pastoral", "Agropastoral"],
     pcode_col=pcode3_col,
 )
+```
+
+
+```python
+gdf_80_100 = gdf_stats_mask[
+    (gdf_stats_mask["include"] == True)
+    & (gdf_stats_mask["perc_binned"] == "80-100")
+]
+gdf_adm3[gdf_adm3["ADM3_PCODE"].isin(gdf_80_100["ADM3_PCODE"])]
+```
+
+
+```python
+gdf_60_80 = gdf_stats_mask[
+    (gdf_stats_mask["include"] == True)
+    & (gdf_stats_mask["perc_binned"] == "60-80")
+]
+gdf_adm3[gdf_adm3["ADM3_PCODE"].isin(gdf_60_80["ADM3_PCODE"])]
+```
+
+
+```python
 g = plot_ndvi_aggr(
     gdf_stats_mask,
     feature_col="perc_binned",
