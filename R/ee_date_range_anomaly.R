@@ -7,7 +7,7 @@
 #' @param baseline_years \code{numeric} vector containing years to be considered in long-term historical baseline 
 #' @param type \code{character} type of anomaly to calculate (z_score, pct_mean, pct_median)-- not implemented yet -just z-score
 #' @param fit_gamma \code{logical} whether to apply gamma probability function to fit distribution (default =F)
-#'  not implemented yet.
+#'  not implemented yet. 
 #' @description a faster and more general function for calculating standard/z scores
 #' @return ee.Image with pixel-level anomaly values. Once `type` argument is implemented it will have different bands depending on anomalies chosen
 #'
