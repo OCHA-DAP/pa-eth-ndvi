@@ -61,23 +61,6 @@ ee_date_range_anomaly <- function(x,
                 
             }))$distinct()
     
-    
-    # this is how you do a collection of collections
-    # x_base_filt <-  rgee::ee$ImageCollection(
-    #     rgee::ee$FeatureCollection(
-    #         year_list_ee$
-    #      map(rgee::ee_utils_pyfunc(
-    #          function(y){
-    #              end_date_temp <- ee$Date$fromYMD( y,end_month, end_day)
-    #              start_date_temp <- end_date_temp$advance(-num_days,"day")
-    #              x_base$
-    #                  filterDate(start_date_temp, end_date_temp)$
-    #                  sum()
-    #          }
-    #      ))
-    #  )$flatten()
-    # )
-    # but we want to do a collection from images
     x_base_filt <- rgee::ee$ImageCollection$fromImages(
         year_list_ee$map(rgee::ee_utils_pyfunc(
             function (y) {
