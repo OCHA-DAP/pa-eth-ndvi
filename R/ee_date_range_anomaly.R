@@ -4,11 +4,10 @@
 #'
 #' @param x 
 #' @param time_range \code{character}
-#' @param baseline 
-#' @param type 
+#' @param baseline_years \code{numeric} vector containing years to be considered in long-term historical baseline 
+#' @param type \code{character} type of anomaly to calculate (z_score, pct_mean, pct_median)-- not implemented yet -just z-score
 #' @description a faster and more general function for calculating standard/z scores
-#' @return
-#' @export
+#' @return ee.Image with pixel-level anomaly values. Once `type` argument is implemented it will have different bands depending on anomalies chosen
 #'
 #' @examples \dontrun{
 #' library(rgee)
@@ -19,7 +18,7 @@
 #' }
 ee_date_range_anomaly <- function(x,
                                   time_range,
-                                  baseline=NULL,
+                                  baseline_years=NULL,
                                   type=c("z_score","pct_mean"),
                                   fit_gamma=NULL
 ){
@@ -41,9 +40,14 @@ ee_date_range_anomaly <- function(x,
         set("used_images",xoi$size())
     
     
-    if(is.null(baseline)){
+    if(is.null(baseline_years)){
         start_date_base <- ee$Date(ee$List(x$get('date_range'))$get(0))
         end_date_base <- ee$Date(time_range[2])$advance(1,"day")
+        x_base <- x$filterDate(start_date_base, end_date_base)
+    }
+    if(!is.null(baseline_years)){
+        start_date_base <- ee$Date(paste0(baseline_years[1],"01-01"))
+        end_date_base <- ee$Date(paste0(baseline_years[length(baseline_years)],"12-31"))$advance(1,"day")
         x_base <- x$filterDate(start_date_base, end_date_base)
     }
     year_list_ee <- x_base$

@@ -111,6 +111,9 @@ env.bak/
 venv.bak/
 **/.DS_Store
 
+*.gpkg
+*.tiff
+
 # Spyder project settings
 .spyderproject
 .spyproject
