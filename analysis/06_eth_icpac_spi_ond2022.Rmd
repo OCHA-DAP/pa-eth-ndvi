@@ -1,0 +1,126 @@
+---
+title: "06_eth_icpac_spi_ond2022"
+output: html_document
+date: "2023-02-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# OND SPI 2022 Ethiopia
+
+
+```{r cars}
+library(rgee)
+library(sf)
+library(tidyverse)
+library(here)
+library(exactextractr) # for fast zonal stats (local)
+library(lubridate)
+
+map(list.files(here("R"),full.names = T), ~source(.x))
+# path to adm 3 layer to use
+zip_path <- file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/cod_ab/eth_cod_ab.shp.zip")
+
+# read in files
+adm3 <- read_shape_zip(path = zip_path, layer = "eth_admbnda_adm3_csa_bofedb_2021")
+# dir(file.path(Sys.getenv("AA_DATA_DIR"),r"{public\raw\eth\spi}"))
+ond_spi <- terra::rast(file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/spi/spi_3_2022_dec.tif"))
+
+ndvi_stats_compiled_fp<- file.path(Sys.getenv("AA_DATA_DIR"),"public/exploration/eth/ndvi/eth_ndvi_woreda_stats_ond2022.csv")
+
+ndvi_stats_compiled <- read_csv(ndvi_stats_compiled_fp)
+ndvi_stats_compiled %>% glimpse()
+
+
+ond_reclass <-  ond_spi
+ond_reclass[ond_reclass>-2] <- NA
+ond_reclass[ond_reclass<=-2] <- 1
+
+
+
+```
+
+```{r}
+
+
+adm3_lt2 <- exact_extract(ond_reclass,
+              st_transform(x = adm3,crs = st_crs(ond_spi)),
+              append_cols=c("ADM1_EN","ADM2_EN","ADM2_PCODE","ADM3_EN","ADM3_PCODE"),
+              # include_area=T,
+              # coverage_fraction=T,
+              c("count")
+)
+
+adm3_median_spi_area <- exact_extract(ond_spi,
+              st_transform(x = adm3,crs = st_crs(ond_spi)),
+              append_cols=c("ADM1_EN","ADM2_EN","ADM2_PCODE","ADM3_EN","ADM3_PCODE"),
+              fun=c("mean","median","count")
+)
+
+
+adm3_stats <- adm3_median_spi_area %>% 
+    rename(total_pixels="count") %>% 
+    left_join(
+        adm3_lt2 %>% 
+            rename(pixels_lte_neg2 = "count")
+    ) %>% 
+    mutate(
+        pct_lte_neg2 = (round((pixels_lte_neg2/total_pixels)*100,1))
+    )
+
+adm3_stats_spatial <- adm3 %>% 
+    left_join(
+        adm3_stats 
+    )
+```
+
+```{r}
+
+adm3_spi_stats_cleaned <- adm3_stats_spatial %>% 
+    st_drop_geometry() %>% 
+    select(matches("^ADM\\d_[EP]|*pix*|*pct*|*mean*|*median*")) %>% 
+    select(ADM1_PCODE,ADM1_EN,ADM2_PCODE,ADM2_EN,ADM2_PCODE,ADM3_EN,ADM3_PCODE,
+           `SPI mean` = mean, `SPI median`=median,`SPI % area <= -2` =pct_lte_neg2) %>% 
+    mutate(across(matches("*mean*|*median*"),~round(.x,6)))
+
+
+
+
+adm3_ndvi_stats_cleaned <- ndvi_stats_compiled %>% 
+    select(
+        ADM3_PCODE,
+        `NDVI # pentads <= 80 % (mean)`= `number of pentads below 80% using mean`,
+        `NDVI % pentads <= 80% (mean)`=`percent of pentads below 80%_mean`,
+        `NDVI bin category (mean)` = `perc_binned_mean`,
+        `NDVI # pentads <= 80% (median)`= `number of pentads below 80% using median`,
+        `NDVI % pentads <= 80% (median)`= `percent of pentads below 80%_median` ,
+        `NDVI bin category (median)` = `perc_binned_median`,
+        `include (agropastoral/pastoral)`=include
+        
+    ) 
+
+nrow(adm3_ndvi_stats_cleaned)
+nrow(adm3_spi_stats_cleaned)
+
+adm3_spi_stats_cleaned %>% 
+    left_join(adm3_ndvi_stats_cleaned) %>% 
+    write_csv(file.path(Sys.getenv("AA_DATA_DIR"),"public/exploration/eth/ndvi/eth_ndvi_spi_ond2022_adm3_stats.csv"),na = "")
+```
+
+
+
+```{r}
+st_write(obj = adm3_stats_spatial,dsn = "eth_climate.gpkg",layer = "eth_adm3_ipac_spi_stats",append = T)
+    
+
+
+adm3_stats %>% 
+    ggplot(aes(x= pct_lte_neg2))+
+    geom_histogram()+
+    scale_x_log10()
+
+
+
+```

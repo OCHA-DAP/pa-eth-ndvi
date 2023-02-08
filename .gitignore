@@ -142,3 +142,9 @@ dmypy.json
 *.ipynb
 .Rproj.user
 .Rhistory
+
+*.gpkg
+*.gpkg-shm
+*.gpkg-wal
+*.png
+*.tif

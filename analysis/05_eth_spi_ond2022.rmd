@@ -39,6 +39,7 @@ zip_path <- file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/cod_ab/eth_cod_a
 # read in files
 adm3 <- read_shape_zip(path = zip_path, layer = "eth_admbnda_adm3_csa_bofedb_2021")
 lhz <- st_read(file.path(Sys.getenv("AA_DATA_DIR"),lhz_fp))
+
 ```
 
 
