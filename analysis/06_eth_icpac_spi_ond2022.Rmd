@@ -10,40 +10,50 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # OND SPI 2022 Ethiopia
 
+This script is used to analyze SPI data recieved from ICPAC.
 
-```{r cars}
+It then takes the output of the NDVI analysis [here]() and merges the data into one output file
+
+```{r setup}
 library(rgee)
 library(sf)
 library(tidyverse)
 library(here)
 library(exactextractr) # for fast zonal stats (local)
 library(lubridate)
-
 map(list.files(here("R"),full.names = T), ~source(.x))
+
 # path to adm 3 layer to use
 zip_path <- file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/cod_ab/eth_cod_ab.shp.zip")
-
-# read in files
+# read in adm3 COD
 adm3 <- read_shape_zip(path = zip_path, layer = "eth_admbnda_adm3_csa_bofedb_2021")
-# dir(file.path(Sys.getenv("AA_DATA_DIR"),r"{public\raw\eth\spi}"))
+
+# OND SPI raster
 ond_spi <- terra::rast(file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/spi/spi_3_2022_dec.tif"))
 
+
+# output of NDVI analysis
 ndvi_stats_compiled_fp<- file.path(Sys.getenv("AA_DATA_DIR"),"public/exploration/eth/ndvi/eth_ndvi_woreda_stats_ond2022.csv")
-
 ndvi_stats_compiled <- read_csv(ndvi_stats_compiled_fp)
-ndvi_stats_compiled %>% glimpse()
+```
 
 
+Here I duplicated the OND raster and do some reclassification to simplify zonal statistics. By make anything greater than -2 NA and everything < -2 equal to one I can later just count the # of pixels =1 to get total pixels < - 2 SPI
+```{r}
 ond_reclass <-  ond_spi
 ond_reclass[ond_reclass>-2] <- NA
 ond_reclass[ond_reclass<=-2] <- 1
-
-
-
 ```
 
-```{r}
+`exact_extract()` automatically does weighted counts based on % of pixel overlap with zonal boundary. First I:
 
+- use the count statistic on the reclassified raster to just get count of values <= -2
+- then I take the unclassified raster an calulate the following zonal stats per boundrary:
+    + mean
+    + median
+    + count (in this case it is the count of all pixels per boundary)
+    
+```{r}
 
 adm3_lt2 <- exact_extract(ond_reclass,
               st_transform(x = adm3,crs = st_crs(ond_spi)),
@@ -58,8 +68,13 @@ adm3_median_spi_area <- exact_extract(ond_spi,
               append_cols=c("ADM1_EN","ADM2_EN","ADM2_PCODE","ADM3_EN","ADM3_PCODE"),
               fun=c("mean","median","count")
 )
+```
 
 
+
+Now that zonal stats have been run and data is in tabular format I can do some simple wrangling and calculations to get all the data how I need it for mapping.
+
+```{r}
 adm3_stats <- adm3_median_spi_area %>% 
     rename(total_pixels="count") %>% 
     left_join(
@@ -75,6 +90,10 @@ adm3_stats_spatial <- adm3 %>%
         adm3_stats 
     )
 ```
+
+- clean up col names of SPI analysis
+- clean up col names from NDVI analysis
+- merge data sets and write file out.
 
 ```{r}
 
@@ -110,17 +129,13 @@ adm3_spi_stats_cleaned %>%
 ```
 
 
-
+- this file that I write to the geopacakge I use for mapping in QGIS.
 ```{r}
 st_write(obj = adm3_stats_spatial,dsn = "eth_climate.gpkg",layer = "eth_adm3_ipac_spi_stats",append = T)
     
-
-
 adm3_stats %>% 
     ggplot(aes(x= pct_lte_neg2))+
     geom_histogram()+
     scale_x_log10()
-
-
 
 ```

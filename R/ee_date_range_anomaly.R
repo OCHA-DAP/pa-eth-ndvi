@@ -48,8 +48,8 @@ ee_date_range_anomaly <- function(x,
         x_base <- x$filterDate(start_date_base, end_date_base)
     }
     if(!is.null(baseline_years)){
-        start_date_base <- ee$Date(paste0(baseline_years[1],"01-01"))
-        end_date_base <- ee$Date(paste0(baseline_years[length(baseline_years)],"12-31"))$advance(1,"day")
+        start_date_base <- ee$Date(paste0(baseline_years[1],"-01-01"))
+        end_date_base <- ee$Date(paste0(baseline_years[length(baseline_years)],"-12-31"))$advance(1,"day")
         x_base <- x$filterDate(start_date_base, end_date_base)
     }
     year_list_ee <- x_base$
