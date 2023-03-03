@@ -26,6 +26,9 @@ from pathlib import Path
 from rasterstats import zonal_stats
 
 from datetime import date
+import math
+from dateutil.relativedelta import relativedelta
+from src import constants
 ```
 
 ##### Importing required functions
@@ -33,7 +36,7 @@ from datetime import date
 
 
 ```python
-from aatoolbox import CodAB
+from ochanticipy import CodAB
 from src.constants import (
     ndvi_colors,
     ndvi_bins,
@@ -88,11 +91,6 @@ gdf_adm3 = gpd.read_file(filename3)
 
 
 ```python
-import math
-from dateutil.relativedelta import relativedelta
-from src import constants
-
-
 def plt_ndvi_dates(gdf_stats, data_col, colp_num=3, caption=None):
     num_plots = len(gdf_stats.date.unique())
     if num_plots == 1:
