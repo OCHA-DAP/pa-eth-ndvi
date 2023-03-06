@@ -12,7 +12,7 @@ Install python code in `src` using the command:
 pip install -e .
 ```
 
-Analyses done in R utilize `Rmds` also `analysis` folder. Any custom R functions that are sourced in a script or notebook are contained in the `R` directory. All required libraries are listed at the top of each R script/notebook. If you do not have the required packaged it can be installed with 
+Analyses done in R utilize `Rmds` which are also contained `analysis` folder. Any custom R functions that are sourced in a script or notebook are contained in the `R` directory. All required libraries are listed at the top of each R script/notebook. If you do not have the required packaged it can be installed with 
 
 ```shell
 install.packates("nameOfPackage")
