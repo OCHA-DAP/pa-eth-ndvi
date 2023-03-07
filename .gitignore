@@ -109,6 +109,10 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+**/.DS_Store
+
+*.gpkg
+*.tiff
 
 # Spyder project settings
 .spyderproject
@@ -138,3 +142,9 @@ dmypy.json
 *.ipynb
 .Rproj.user
 .Rhistory
+
+*.gpkg
+*.gpkg-shm
+*.gpkg-wal
+*.png
+*.tif

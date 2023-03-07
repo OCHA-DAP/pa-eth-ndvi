@@ -1,0 +1,177 @@
+---
+title: "05_eth_spi_ond2022_calc"
+output: html_document
+date: "2023-02-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## SPI
+
+```{r cars}
+library(rgee)
+library(sf)
+library(tidyverse)
+library(here)
+library(exactextractr) # for fast zonal stats (local)
+library(lubridate)
+ee_Initialize(drive = T)
+sf::sf_use_s2(use_s2 = F) # too strict on topology
+map(list.files(here("R"),full.names = T), ~source(.x))
+
+write_raster <- c(T,F)[2]
+```
+
+
+```{r}
+# load chirps
+chirps_link <- "UCSB-CHG/CHIRPS/DAILY"
+chirps_ic<- rgee::ee$ImageCollection(chirps_link)
+
+# livelihood zone file path
+lhz_fp <- "public/exploration/eth/ET_LHZ_2009/ET_LHZ_2009.shp"
+
+# path to adm 3 layer to use
+zip_path <- file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/cod_ab/eth_cod_ab.shp.zip")
+
+# read in files
+adm3 <- read_shape_zip(path = zip_path, layer = "eth_admbnda_adm3_csa_bofedb_2021")
+lhz <- st_read(file.path(Sys.getenv("AA_DATA_DIR"),lhz_fp))
+
+```
+
+
+filter/wrangle down ROI.
+- was initially trying to minimze ROI size for calculations. However, turns out ward level zonal stats are probably going to be too big/complex to do in GEE with `via="drive"` which is the simplest method for relatively big complex geoms. Therefore, it's better to do last step locally -- so these steps are bit pointless... nonetheless, they are fine to leave in as well
+```{r}
+lhz_of_interest <- lhz %>% 
+    filter(LZTYPE %in% c("Agropastoral","Pastoral"))
+
+lhz_of_interest_t <- lhz_of_interest %>% 
+    st_transform(crs = st_crs(adm3))
+
+roi_lhz_of_interest <- adm3[lhz_of_interest_t,] %>%
+    st_transform(crs=4326)
+
+roi_outline <-  roi_lhz_of_interest %>% 
+    summarise()
+
+roi_centroid <-  roi_outline %>% 
+    st_centroid()
+
+
+# for interactive GEE mapping
+roi_centroid_ee <- sf_as_ee(roi_centroid)
+```
+
+
+# SPI
+
+reduce chirps to OND SPI.
+
+```{r}
+ond2022_spi<- ee_date_range_anomaly(x = chirps_ic,time_range = c("2022-10-01","2022-12-31"))
+
+# ended up getting icpac SPI - they used 1981-2010 as baseline but fit to gamma distribution. Curious to compare:
+
+ond2022_spi_baseline2010<- ee_date_range_anomaly(x = chirps_ic,
+                                    time_range = c("2022-10-01","2022-12-31"),
+                                    baseline_years = c(1981:2010))
+
+
+```
+
+
+## visualize
+
+The mapping/visualization can take a while to load - be patient. Not sure why sometimes it is lightning fast and other times sluggish
+```{r}
+Map$centerObject(eeObject = roi_centroid_ee,zoom = 6)
+Map$addLayer(ond2022_spi,visParams = list(min= -0.27,
+                                          max=0.477,
+                                          palette=c("darkblue","green","red")
+                                          ),
+             name = "ond 2022spi")
+```
+
+
+
+## EE Zonal stats
+
+**Please Skip Step** -- eval set to false - running here is just a waste of time
+
+This failed - said task was too big, to do this you need to set up Google Cloud Storage bucket... could set this up or we just download the raster -- this might be better anyways to compare SPI calcs
+```{r,eval=F}
+median_ond2022_spi <- tidyrgee::ee_extract_tidy(x =ond2022_spi,
+                                                y=roi_lhz_of_interest,
+                                                stat="median",
+                                                scale=5500, via="drive")
+```
+
+
+## Local zonal stats
+
+let's convert to raster and download... the smaller we can make the clip outline the better (turns out we are going to get the whole country of ETH anyways so it doesn't matter)
+
+Complex vector geometries are no bueno in GEE so let's simplify with bbox (this is still useful)
+
+Create a bbox  & clip. 
+```{r}
+roi_bbox <- roi_lhz_of_interest %>% 
+    st_bbox() %>% 
+    st_as_sfc()
+
+roi_bbox_ee <- sf_as_ee(roi_bbox)
+
+on2022_spi_clipped <- ond2022_spi$clip(roi_bbox_ee)
+on2022_spi_baseline2010_clipped <- ond2022_spi_baseline2010$clip(roi_bbox_ee)
+```
+
+convert to local raster 
+```{r}
+ond_2022_spi_c_r <- ee_as_raster(image = on2022_spi_clipped,region = roi_bbox_ee,scale = 5500)
+ond_2022_spi_b2010_r <- ee_as_raster(image = on2022_spi_baseline2010_clipped,
+                                     region = roi_bbox_ee,
+                                     scale = 5500)
+
+if(write_raster){
+    raster::writeRaster(ond_2022_spi_c_r,"spi3_ond2022_eth_roi.tiff",overwrite=T)
+    raster::writeRaster(ond_2022_spi_b2010_r,"spi3_ond2022_base2010_eth_roi.tiff",overwrite=T)
+}
+```
+
+## zonal statistics
+
+Let's make use of the speedy `{exactextractr} package!
+
+```{r}
+
+# this is so fast we can actually do for all admins
+adm3_t <- st_transform(adm3,crs = st_crs(ond_2022_spi_c_r))
+
+
+roi_ondspi3_median <- exact_extract(ond_2022_spi_c_r,
+                                    adm3_t,
+                                    append_cols=c("ADM1_EN","ADM2_EN","ADM2_PCODE","ADM3_EN","ADM3_PCODE"),
+                                    'median')
+
+roi_ondspi3_median <- roi_ondspi3_median %>% 
+    rename(median_ond2022_spi="median") %>% 
+    select(ADM3_PCODE,median_ond2022_spi)
+
+roi_ondspi3_mean <- exact_extract(ond_2022_spi_c_r,
+                                    adm3_t,
+                                    append_cols=c("ADM1_EN","ADM2_EN","ADM2_PCODE","ADM3_EN","ADM3_PCODE"),
+                                    'mean')
+
+roi_ondspi3_mean <- roi_ondspi3_mean %>% 
+    rename(mean_ond2022_spi="mean") %>% 
+    select(ADM3_PCODE,mean_ond2022_spi)
+
+adm3 %>% 
+    left_join(roi_ondspi3_median,by="ADM3_PCODE") %>% 
+    left_join(roi_ondspi3_mean, by="ADM3_PCODE") %>% 
+    st_write("eth_climate.gpkg",layer = "adm3_ond2022_spi3")
+```
