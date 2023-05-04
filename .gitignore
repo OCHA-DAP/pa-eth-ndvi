@@ -148,3 +148,5 @@ dmypy.json
 *.gpkg-wal
 *.png
 *.tif
+
+data/*
