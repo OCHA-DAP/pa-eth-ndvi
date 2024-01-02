@@ -14,10 +14,11 @@ eth_shp <- st_read(
     "eth_admbnda_adm2_csa_bofedb_2021.shp"))
 
 ##Afar Region
-plot_fxn <- function(eth_shp, prec_file, subtitle, date){
+plot_fxn <- function(eth_shp, prec_file, subtitle, mon_date, regions){
     data_df <- prec_file[-1,] %>%
-        filter(date == date) %>%
-        merge(eth_shp, by = "ADM2_PCODE", all.y = TRUE)
+        filter(date == mon_date) %>%
+        merge(eth_shp, by = "ADM2_PCODE", all = TRUE) %>%
+        mutate(across(r3q, ~ case_when(ADM1_EN %in% regions ~ r3q, .default = NA)))
     ggplot() +
         geom_sf(data = data_df, aes(geometry = geometry, fill = as.numeric(r3q))) + 
         ggtitle(label = "3-Month Rainfall Anomalies in Percentage",
@@ -27,17 +28,20 @@ plot_fxn <- function(eth_shp, prec_file, subtitle, date){
 }
 plot_fxn(eth_shp, prec_file, 
          subtitle = "July to September 2023", 
-         date = "2023-09-21")
+         mon_date = "2023-09-21",
+         regions = "Afar")
 
-mam2023 <- prec_file[-1,] %>%
-    filter(date == "2023-05-21")
+plot_fxn(eth_shp, prec_file, 
+         subtitle = "March to May 2023", 
+         mon_date = "2023-05-21",
+         regions = "Afar")
 
-mam23_shp <- merge(eth_shp, mam2023, by = "ADM2_PCODE", all.x = TRUE)
+plot_fxn(eth_shp, prec_file, 
+         subtitle = "June to Start of September 2023", 
+         mon_date = "2023-09-01",
+         regions = c("Amhara", "Tigray"))
 
-ggplot() +
-    geom_sf(data = mam23_shp, aes(fill = as.numeric(r3q))) + 
-    ggtitle(label = "3-Month Rainfall Anomalies in Percentage",
-            subtitle = "March to May 2023") +
-    scale_fill_gradient(low="lightblue", high="navyblue") +
-    labs(fill = "3-month anomaly in %") +
-    theme_hdx()
+plot_fxn(eth_shp, prec_file, 
+         subtitle = "Mid February to Mid May 2023", 
+         mon_date = "2023-05-11",
+         regions = c("Amhara", "Tigray"))
