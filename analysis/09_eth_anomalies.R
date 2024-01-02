@@ -123,9 +123,9 @@ full_rain_df <- prec_file %>%
                 starts_with("2"))
 
 full_df <- eth_shp_adm3 %>%
-    select(ADM3_PCODE, ADM3_EN, ADM2_PCODE) %>%
+    select(ADM3_PCODE, ADM3_EN, ADM2_PCODE, ADM2_EN) %>%
     st_drop_geometry() %>%
-    merge(full_rain_df, by="ADM2_PCODE") %>%
-    merge(full_ndvi_df, by = "ADM3_PCODE")
+    merge(full_rain_df, by="ADM2_PCODE", all = T) %>%
+    merge(full_ndvi_df, by = "ADM3_PCODE", all = T)
 
 write_csv(full_df, file.path(csv_path, "full_seasonal_analysis.csv"))
