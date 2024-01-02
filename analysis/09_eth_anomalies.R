@@ -13,18 +13,24 @@ eth_shp <- st_read(
     "eth_adm_csa_bofedb_2021_shp", 
     "eth_admbnda_adm2_csa_bofedb_2021.shp"))
 
+bin_breaks <- c(0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200)
+col_vals_fn <- colorRampPalette(c("lightblue", "navyblue"))
+col_vals <- setNames(col_vals_fn(length(bin_breaks)-1), cut(bin_breaks, breaks = bin_breaks)[-1])
+
 ##Afar Region
 plot_fxn <- function(eth_shp, prec_file, subtitle, mon_date, regions){
     data_df <- prec_file[-1,] %>%
         filter(date == mon_date) %>%
         merge(eth_shp, by = "ADM2_PCODE", all = TRUE) %>%
-        mutate(across(r3q, ~ case_when(ADM1_EN %in% regions ~ r3q, .default = NA)))
+        mutate(across(r3q, ~ case_when(ADM1_EN %in% regions ~ r3q, .default = NA)),
+               r3q_binned = cut(as.numeric(r3q), breaks = bin_breaks))
     ggplot() +
-        geom_sf(data = data_df, aes(geometry = geometry, fill = as.numeric(r3q))) + 
+        geom_sf(data = data_df, aes(geometry = geometry, fill = r3q_binned)) + 
         ggtitle(label = "3-Month Rainfall Anomalies in Percentage",
                 subtitle = subtitle) +
-        scale_fill_gradient(low="lightblue", high="navyblue") +
-        labs(fill = "3-month anomaly in %")
+        scale_fill_manual(values = col_vals, na.value = "white") +
+        labs(fill = "3-month anomaly in %") + 
+        theme(legend.key.width = unit(0.5, "cm"))
 }
 plot_fxn(eth_shp, prec_file, 
          subtitle = "July to September 2023", 
