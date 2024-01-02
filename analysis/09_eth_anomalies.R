@@ -32,8 +32,18 @@ plot_fxn(eth_shp, prec_file,
          regions = "Afar")
 
 plot_fxn(eth_shp, prec_file, 
+         subtitle = "July to September 2022", 
+         mon_date = "2022-09-21",
+         regions = "Afar")
+
+plot_fxn(eth_shp, prec_file, 
          subtitle = "March to May 2023", 
          mon_date = "2023-05-21",
+         regions = "Afar")
+
+plot_fxn(eth_shp, prec_file, 
+         subtitle = "March to May 2022", 
+         mon_date = "2022-05-21",
          regions = "Afar")
 
 plot_fxn(eth_shp, prec_file, 
@@ -42,6 +52,16 @@ plot_fxn(eth_shp, prec_file,
          regions = c("Amhara", "Tigray"))
 
 plot_fxn(eth_shp, prec_file, 
+         subtitle = "June to Start of September 2022", 
+         mon_date = "2022-09-01",
+         regions = c("Amhara", "Tigray"))
+
+plot_fxn(eth_shp, prec_file, 
          subtitle = "Mid February to Mid May 2023", 
          mon_date = "2023-05-11",
+         regions = c("Amhara", "Tigray"))
+
+plot_fxn(eth_shp, prec_file, 
+         subtitle = "Mid February to Mid May 2022", 
+         mon_date = "2022-05-11",
          regions = c("Amhara", "Tigray"))
