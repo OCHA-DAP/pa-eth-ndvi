@@ -14,7 +14,7 @@ eth_shp <- st_read(
     "eth_admbnda_adm2_csa_bofedb_2021.shp"))
 
 bin_breaks <- c(0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200)
-col_vals_fn <- colorRampPalette(c("lightblue", "navyblue"))
+col_vals_fn <- colorRampPalette(c("red", "white", "navyblue"))
 col_vals <- setNames(col_vals_fn(length(bin_breaks)-1), cut(bin_breaks, breaks = bin_breaks)[-1])
 
 ##Afar Region
@@ -119,13 +119,14 @@ full_rain_df <- prec_file %>%
     select(date, ADM2_PCODE, r3q) %>%
     mutate(r3q = as.numeric(r3q)) %>%
     pivot_wider(names_from = date, values_from = r3q, values_fn = {mean}) %>%
-    rename_with(~ paste0("3-month Rainfall Anomaly for Period Ending ", .x, recycle0 = TRUE),
+    rename_with(~ paste0("3-month Rainfall Anomaly for Period Ending with dekad ", .x, recycle0 = TRUE),
                 starts_with("2"))
 
 full_df <- eth_shp_adm3 %>%
-    select(ADM3_PCODE, ADM3_EN, ADM2_PCODE) %>%
+    select(ADM3_PCODE, ADM3_EN, ADM2_PCODE, ADM2_EN) %>%
     st_drop_geometry() %>%
-    merge(full_rain_df, by="ADM2_PCODE") %>%
-    merge(full_ndvi_df, by = "ADM3_PCODE")
+    merge(full_rain_df, by="ADM2_PCODE", all = T) %>%
+    merge(full_ndvi_df, by = "ADM3_PCODE", all = T)
+
 
 write_csv(full_df, file.path(csv_path, "full_seasonal_analysis.csv"))
