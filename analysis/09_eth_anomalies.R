@@ -128,4 +128,5 @@ full_df <- eth_shp_adm3 %>%
     merge(full_rain_df, by="ADM2_PCODE", all = T) %>%
     merge(full_ndvi_df, by = "ADM3_PCODE", all = T)
 
+
 write_csv(full_df, file.path(csv_path, "full_seasonal_analysis.csv"))

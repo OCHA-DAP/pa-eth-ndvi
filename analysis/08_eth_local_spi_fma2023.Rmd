@@ -1,0 +1,133 @@
+---
+title: "06_eth_icpac_spi_ond2022"
+output: html_document
+date: "2023-02-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# SPI  Ethiopia
+
+This script is used to analyze SPI data recieved from WFP
+
+It then takes the output of the NDVI analysis [here]() and merges the data into one output file.
+
+**note:** gdrive not syncing properly so i loaded files from folder in repo (gitignored). Controlling where the files are loaded from with `load_local_ndvi_spi_local` logical parameter. if/when files sync could change to F to load from GDRIVE.
+
+```{r setup}
+library(rgee)
+library(sf)
+library(tidyverse)
+library(here)
+library(exactextractr) # for fast zonal stats (local)
+library(lubridate)
+library(terra)
+map(list.files(here("R"),full.names = T), ~source(.x))
+
+# path to adm 3 layer to use
+zip_path <- file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/cod_ab/eth_cod_ab.shp.zip")
+# read in adm3 COD
+adm3 <- read_shape_zip(path = zip_path, layer = "eth_admbnda_adm3_csa_bofedb_2021")
+
+load_local_ndvi_spi_local <- c(T,F)[1]
+```
+
+
+Load spi/ndvi files
+```{r}
+if(!load_local_ndvi_spi_local){
+    ndvi_stats_compiled_fp<- file.path(Sys.getenv("AA_DATA_DIR"),"public/exploration/eth/ndvi/eth_ndvi_woreda_stats_ma2023.csv")    
+}
+if(load_local_ndvi_spi_local){
+    spi_dir <- "data/eth_spi"
+    ndvi_stats_compiled_fp <- "data/eth_ndvi_woreda_stats_ma2023.csv"
+}
+# spi rasters
+local_spi2_fp <- file.path(spi_dir,"ethr2s202304d2.tif")
+local_spi3_fp <- file.path(spi_dir,"ethr3s202304d2.tif")
+local_spi2 <- terra::rast(local_spi2_fp)
+local_spi3 <- terra::rast(local_spi3_fp)
+
+# NDVI analysis
+ndvi_stats_compiled <- read_csv(ndvi_stats_compiled_fp)
+```
+
+
+check values and rescale
+
+```{r}
+# check if any NA values -- looks lik there are NAs explicitly
+terra::values(local_spi3)
+hist(local_spi3 %>% values())
+
+hist((local_spi3*0.001) %>% values())
+
+
+local_spi3 <- local_spi3*0.001
+local_spi2 <- local_spi2*0.001
+```
+
+
+Same analysis from last round, but since I have to do it twice i just wrapped the process in the function `spi_zonal_stats` in `R` directory to simplify code and minimze potential for mistakes
+    
+```{r}
+
+spi3_stats<- spi_zonal_stats(spi_raster = local_spi3,poly = adm3)
+spi2_stats<- spi_zonal_stats(spi_raster = local_spi2,poly = adm3)
+
+if(write_raster){
+st_write(spi3_stats,dsn = "eth_climate_db.gpkg",layer = "fma_spi3_wfp_prelim",apppend=T)
+st_write(spi2_stats,dsn = "eth_climate_db.gpkg",layer = "fm_spi2_wfp_prelim",append=T)    
+}
+
+
+spi2_stats %>% 
+    filter(pixels_lte_neg2!=0)
+```
+
+
+- clean up col names of SPI analysis
+- clean up col names from NDVI analysis
+- merge data sets and write file out.
+
+```{r}
+
+adm3_spi_stats_cleaned <- spi3_stats %>% 
+    st_drop_geometry() %>% 
+    select(matches("^ADM\\d_[EP]|*pix*|*pct*|*mean*|*median*")) %>% 
+    select(ADM1_PCODE,ADM1_EN,ADM2_PCODE,ADM2_EN,ADM2_PCODE,ADM3_EN,ADM3_PCODE,
+           `FMA SPI3 mean` = mean, `FMA SPI3 median`=median,`FMA SPI3 % area <= -2` =pct_lte_neg2) %>% 
+    mutate(across(matches("*mean*|*median*"),~round(.x,6)))
+
+adm2_spi_stats_cleaned <- spi2_stats %>% 
+    st_drop_geometry() %>% 
+    select(matches("^ADM\\d_[EP]|*pix*|*pct*|*mean*|*median*")) %>% 
+    select(ADM1_PCODE,ADM1_EN,ADM2_PCODE,ADM2_EN,ADM2_PCODE,ADM3_EN,ADM3_PCODE,
+           `MA SPI2 mean` = mean, `MA SPI2 median`=median,`MA SPI2 % area <= -2` =pct_lte_neg2) %>% 
+    mutate(across(matches("*mean*|*median*"),~round(.x,6)))
+
+adm3_spi_stats_compiled <- adm3_spi_stats_cleaned %>% 
+    left_join(adm2_spi_stats_cleaned)
+
+
+adm3_ndvi_stats_cleaned <- ndvi_stats_compiled %>% 
+    select(
+        ADM3_PCODE,
+        `NDVI # pentads <= 80 % (mean)`= `number of pentads below 80% using mean`,
+        `NDVI % pentads <= 80% (mean)`=`percent of pentads below 80%_mean`,
+        `NDVI bin category (mean)` = `perc_binned_mean`,
+        `NDVI # pentads <= 80% (median)`= `number of pentads below 80% using median`,
+        `NDVI % pentads <= 80% (median)`= `percent of pentads below 80%_median` ,
+        `NDVI bin category (median)` = `perc_binned_median`,
+        `include (agropastoral/pastoral)`=include
+    ) 
+
+nrow(adm3_ndvi_stats_cleaned)
+nrow(adm3_spi_stats_cleaned)
+
+adm3_spi_stats_cleaned %>% 
+    left_join(adm3_ndvi_stats_cleaned) %>% 
+    write_csv(file.path(Sys.getenv("AA_DATA_DIR"),"public/exploration/eth/ndvi/eth_ndvi_spi_fma2023_adm3_stats.csv"),na = "")
+```

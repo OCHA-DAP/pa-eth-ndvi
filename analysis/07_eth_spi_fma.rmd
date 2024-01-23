@@ -1,0 +1,203 @@
+---
+title: "05_eth_spi_ond2022_calc"
+output: html_document
+date: "2023-02-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## SPI
+
+```{r cars}
+library(rgee)
+library(sf)
+library(tidyverse)
+library(here)
+library(exactextractr) # for fast zonal stats (local)
+library(lubridate)
+ee_Initialize(drive = T)
+sf::sf_use_s2(use_s2 = F) # too strict on topology
+map(list.files(here("R"),full.names = T), ~source(.x))
+
+write_raster <- c(T,F)[2]
+```
+
+
+```{r}
+# load chirps
+chirps_link <- "UCSB-CHG/CHIRPS/DAILY"
+chirps_ic<- rgee::ee$ImageCollection(chirps_link)
+
+# livelihood zone file path
+lhz_fp <- "public/exploration/eth/ET_LHZ_2009/ET_LHZ_2009.shp"
+
+# path to adm 3 layer to use
+zip_path <- file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/cod_ab/eth_cod_ab.shp.zip")
+
+# read in files
+adm3 <- read_shape_zip(path = zip_path, layer = "eth_admbnda_adm3_csa_bofedb_2021")
+lhz <- st_read(file.path(Sys.getenv("AA_DATA_DIR"),lhz_fp))
+
+```
+
+
+filter/wrangle down ROI.
+- was initially trying to minimze ROI size for calculations. However, turns out ward level zonal stats are probably going to be too big/complex to do in GEE with `via="drive"` which is the simplest method for relatively big complex geoms. Therefore, it's better to do last step locally -- so these steps are bit pointless... nonetheless, they are fine to leave in as well
+```{r}
+lhz_of_interest <- lhz %>% 
+    filter(LZTYPE %in% c("Agropastoral","Pastoral"))
+
+lhz_of_interest_t <- lhz_of_interest %>% 
+    st_transform(crs = st_crs(adm3))
+
+roi_lhz_of_interest <- adm3[lhz_of_interest_t,] %>%
+    st_transform(crs=4326)
+
+roi_outline <-  roi_lhz_of_interest %>% 
+    summarise()
+
+roi_centroid <-  roi_outline %>% 
+    st_centroid()
+
+
+# for interactive GEE mapping
+roi_centroid_ee <- sf_as_ee(roi_centroid)
+```
+
+
+# SPI
+
+reduce chirps to OND SPI.
+
+```{r}
+
+fm2023_spi_baseline2010<- ee_date_range_anomaly(x = chirps_ic,
+                                    time_range = c("2023-02-01","2023-03-31"),
+                                    baseline_years = c(1981:2010))
+
+
+```
+
+
+## visualize
+
+The mapping/visualization can take a while to load - be patient. Not sure why sometimes it is lightning fast and other times sluggish
+```{r}
+Map$centerObject(eeObject = roi_centroid_ee,zoom = 6)
+Map$addLayer(fm2023_spi_baseline2010,visParams = list(min= -0.27,
+                                          max=0.477,
+                                          palette=c("darkblue","green","red")
+                                          ),
+             name = "ond 2022spi")
+```
+
+
+
+## EE Zonal stats
+
+**Please Skip Step** -- eval set to false - running here is just a waste of time
+
+This failed - said task was too big, to do this you need to set up Google Cloud Storage bucket... could set this up or we just download the raster -- this might be better anyways to compare SPI calcs
+```{r,eval=F}
+fm2023_spi_baseline2010 <- tidyrgee::ee_extract_tidy(x =fm2023_spi_baseline2010,
+                                                y=roi_lhz_of_interest,
+                                                stat="median",
+                                                scale=5500,
+                                                via="drive")
+```
+
+
+## Local zonal stats
+
+let's convert to raster and download... the smaller we can make the clip outline the better (turns out we are going to get the whole country of ETH anyways so it doesn't matter)
+
+Complex vector geometries are no bueno in GEE so let's simplify with bbox (this is still useful)
+
+Create a bbox  & clip. 
+```{r}
+roi_bbox <- roi_lhz_of_interest %>% 
+    st_bbox() %>% 
+    st_as_sfc()
+
+roi_bbox_ee <- sf_as_ee(roi_bbox)
+
+fm2023_spi_baseline2010 <- fm2023_spi_baseline2010$clip(roi_bbox_ee)
+fm2023_spi_baseline2010_clipped <- fm2023_spi_baseline2010$clip(roi_bbox_ee)
+```
+
+convert to local raster 
+```{r}
+fm2023_spi_c_r <- ee_as_raster(image = fm2023_spi_baseline2010_clipped,
+                                     region = roi_bbox_ee,
+                                     scale = 5500)
+
+
+if(write_raster){
+    raster::writeRaster(fm2023_spi_c_r,file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/spi/spi_2_2023_mar_chirps_normal.tif"), overwrite=T)
+    
+}
+```
+
+
+```{r}
+spi_r <- terra::rast(file.path(Sys.getenv("AA_DATA_DIR"),"public/raw/eth/spi/spi_2_2023_mar_chirps_normal.tif"))
+```
+
+
+Here I duplicated the OND raster and do some reclassification to simplify zonal statistics. By make anything greater than -2 NA and everything < -2 equal to one I can later just count the # of pixels =1 to get total pixels < - 2 SPI
+```{r}
+spi_r_reclass <-  spi_r
+spi_r_reclass[spi_r_reclass>-2] <- NA
+spi_r_reclass[spi_r_reclass<=-2] <- 1
+```
+
+`exact_extract()` automatically does weighted counts based on % of pixel overlap with zonal boundary. First I:
+
+- use the count statistic on the reclassified raster to just get count of values <= -2
+- then I take the unclassified raster an calulate the following zonal stats per boundrary:
+    + mean
+    + median
+    + count (in this case it is the count of all pixels per boundary)
+    
+```{r}
+
+adm3_lt2 <- exact_extract(spi_r_reclass,
+              st_transform(x = adm3,crs = st_crs(spi_r_reclass)),
+              append_cols=c("ADM1_EN","ADM2_EN","ADM2_PCODE","ADM3_EN","ADM3_PCODE"),
+              # include_area=T,
+              # coverage_fraction=T,
+              c("count")
+)
+
+adm3_median_spi_area <- exact_extract(spi_r,
+              st_transform(x = adm3,crs = st_crs(spi_r)),
+              append_cols=c("ADM1_EN","ADM2_EN","ADM2_PCODE","ADM3_EN","ADM3_PCODE"),
+              fun=c("mean","median","count")
+)
+
+```
+
+
+Now that zonal stats have been run and data is in tabular format I can do some simple wrangling and calculations to get all the data how I need it for mapping.
+
+```{r}
+adm3_stats <- adm3_median_spi_area %>% 
+    rename(total_pixels="count") %>% 
+    left_join(
+        adm3_lt2 %>% 
+            rename(pixels_lte_neg2 = "count")
+    ) %>% 
+    mutate(
+        pct_lte_neg2 = (round((pixels_lte_neg2/total_pixels)*100,1))
+    )
+
+adm3_stats_spatial <- adm3 %>% 
+    left_join(
+        adm3_stats 
+    )
+
+st_write(obj = adm3_stats_spatial,dsn = "eth_climate_db.gpkg",layer = "eth_adm3_fm2023_spi_stats")
+st_layers(adm3_stats_spatial,"eth_climate_db.gpkg","")
+```
