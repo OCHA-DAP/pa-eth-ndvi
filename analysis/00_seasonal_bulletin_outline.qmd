@@ -1,0 +1,135 @@
+---
+title: "Seasonal Bulletin"
+author: "UN OCHA Centre for Humanitarian Data"
+date: '`r Sys.Date()`'
+toc: true
+format: html
+editor: visual
+css: |
+  body, #fig-forecast {
+    overflow-x: hidden;
+  }
+---
+
+# Ethiopia - Seasonal Outlook
+
+## Areas of Interest and scale of anomaly
+
+### Kiremt-receiving woredas
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+```
+
+```{r libraries, echo = FALSE, warning=FALSE, message=FALSE, results='hide'}
+library(tidyverse)
+library(sf)
+library(arrow)
+library(scales)
+library(gghdx)
+gghdx()
+
+# reading in land mask file
+land_mask <- read_csv(
+    file.path(
+        dirname(
+            dirname(
+                Sys.getenv("AA_DATA_DIR"))), 
+        "Ethiopia", 
+        "2024", 
+        "Trigger Development", 
+        "woreda_land_mask.csv"))
+
+# reading in admin file
+eth_adm3_codab <- st_read(
+  file.path(
+    Sys.getenv("AA_DATA_DIR"),
+    "public", "raw", "eth", "cod_ab", "Admin_2024.gdb.zip"), 
+  layer = "eth_admbnda_adm3_csa_bofedb_2024")
+
+# reading in file with seasons from ASAP
+eth_seasons <- read_csv(
+    file.path(
+        dirname(
+            dirname(
+                Sys.getenv("AA_DATA_DIR"))), 
+        "Ethiopia", 
+        "2024", 
+        "Trigger Development", 
+        "seasons_for_woredas.csv"))
+
+jjas_woredas <- eth_seasons %>%
+    filter(season1 == "JJAS")
+
+# reading in the lastest forecast
+may_forecast <- read_csv(
+    file.path(
+        dirname(
+            dirname(
+                Sys.getenv("AA_DATA_DIR"))), 
+        "Ethiopia", 
+        "2024", 
+        "Trigger Development", 
+        "eth_forecast_may_2024.csv"))
+
+# reading in past re-forecast and forecast data
+# upto 2016, re-forecasts, from 2017, forecasts
+adm3_forecast <- read_parquet("../TriggerApp2024/data/df_eth_mars_zonal_adm3.parquet")
+
+# filtering for only JJAS forecasts
+jjas_forecast <- adm3_forecast %>%
+    filter(adm3_pcode %in% jjas_woredas$admin3Pcode & 
+               pub_month == 5 & 
+               valid_month %in% c(6, 7, 8, 9)) %>%
+    mutate(pub_year = year(pub_date)) %>%
+    group_by(adm3_pcode, pub_year, pub_month) %>%
+    summarise(Seasonal_total = sum(value, na.rm = T))
+
+# Getting the seasonal average over the years
+forecast_mean <- jjas_forecast %>%
+    filter(between(pub_year, 1993, 2016)) %>%
+    group_by(adm3_pcode) %>%
+    summarise(Seasonal_average = mean(Seasonal_total, na.rm = T)) %>%
+    ungroup()
+
+# the seasonal average
+season_ave <- forecast_mean %>% 
+    filter(adm3_pcode %in% jjas_woredas$admin3Pcode) %>% 
+    summarise(seasonal_average = mean(Seasonal_average, na.rm=T))
+
+```
+
+```{r fig-forecast, warning=FALSE, message=FALSE, fig.height=4}
+#| label: fig-forecast
+#| fig-cap: "Areas of Interest"
+#| fig-subcap:
+#|   - "Kiremt-receiving woredas with their respective livelihoods"
+#|   - "Seasonal forecast by woreda" 
+#| layout-nrow: 1
+#| column: page
+
+# plotting woredas for JJAS
+eth_seasons %>%
+    merge(eth_adm3_codab, by = "admin3Pcode") %>%
+    merge(land_mask, by = "admin3Pcode") %>%
+    mutate(land_mask_jjas = case_when(season1 != "JJAS" ~ NA,
+                                      .default = land_mask)) %>%
+    ggplot() +
+    geom_sf(aes(fill = land_mask_jjas, geometry = Shape)) + 
+    scale_fill_discrete(na.translate = F) +
+    labs(title = "Woredas that have JJAS(Kiremt) season",
+         fill = "Land Mask") +
+    theme(plot.margin = margin(0, 2, 0, 2, "cm"))
+
+# plotting forecast, anomalies etc
+ggplot()
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+
+```
+
+------------------------------------------------------------------------
