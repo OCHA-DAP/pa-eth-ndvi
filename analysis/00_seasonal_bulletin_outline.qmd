@@ -3,6 +3,9 @@ title: "Seasonal Bulletin"
 author: "UN OCHA Centre for Humanitarian Data"
 date: '`r Sys.Date()`'
 toc: true
+toc-location: left
+toc-title: "Outline"
+margin-right: 5%
 format: html
 editor: visual
 css: |
@@ -13,7 +16,7 @@ css: |
 
 # Ethiopia - Seasonal Outlook
 
-## Areas of Interest and scale of anomaly
+## Areas of Interest and Scale of Anomaly
 
 ### Kiremt-receiving woredas
 
@@ -113,7 +116,7 @@ ave_2024 <- may_forecast %>%
 #|   - "Kiremt-receiving woredas with their respective livelihoods"
 #|   - "Seasonal forecast by woreda" 
 #| layout-nrow: 1
-#| column: page
+#| column: body
 
 # plotting woredas for JJAS
 eth_seasons %>%
@@ -126,7 +129,7 @@ eth_seasons %>%
     scale_fill_discrete(na.translate = F) +
     labs(title = "Woredas that have JJAS(Kiremt) season",
          fill = "Land Mask") +
-    theme(plot.margin = margin(0, 2, 0, 2, "cm"))
+    theme(plot.margin = margin(0, 0, 0, 0, "cm"))
 
 # plotting forecast, anomalies etc
 may_forecast %>%
@@ -143,9 +146,12 @@ may_forecast %>%
                          high = "#0f52ba", midpoint = 0, 
                          na.value = "lightgrey") +
     labs(title = "Seasonal Forecast: Rainfall Anomaly",
-         fill = "Rainfall Anomaly")
+         fill = "Rainfall Anomaly") +
+    theme(plot.margin = margin(0, 0, 0, 0, "cm"))
 
 ```
+
+An ENSO-neutral phase and a positive IOD phase will characterise the upcoming season. This would result in
 
 ```{r, warning=FALSE, message=FALSE}
 
