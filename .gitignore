@@ -151,3 +151,4 @@ dmypy.json
 
 data/*
 /.aws
+/analysis/00_seasonal_bulletin_outline_files

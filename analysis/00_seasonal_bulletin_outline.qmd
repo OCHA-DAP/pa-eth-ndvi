@@ -75,7 +75,7 @@ may_forecast <- read_csv(
 
 # reading in past re-forecast and forecast data
 # upto 2016, re-forecasts, from 2017, forecasts
-adm3_forecast <- read_parquet("../TriggerApp2024/data/df_eth_mars_zonal_adm3.parquet")
+adm3_forecast <- read_parquet("../../TriggerApp2024/data/df_eth_mars_zonal_adm3.parquet")
 
 # filtering for only JJAS forecasts
 jjas_forecast <- adm3_forecast %>%
@@ -97,6 +97,12 @@ forecast_mean <- jjas_forecast %>%
 season_ave <- forecast_mean %>% 
     filter(adm3_pcode %in% jjas_woredas$admin3Pcode) %>% 
     summarise(seasonal_average = mean(Seasonal_average, na.rm=T))
+
+# seasonal value for 2024
+ave_2024 <- may_forecast %>% 
+    filter(admin3Pcode %in% jjas_woredas$admin3Pcode) %>% 
+    summarise(country_mean = mean(Seasonal_Forecast, na.rm=T)) %>%
+    mutate(pub_year = year(as.Date("2024-05-01")))
 
 ```
 
@@ -123,7 +129,21 @@ eth_seasons %>%
     theme(plot.margin = margin(0, 2, 0, 2, "cm"))
 
 # plotting forecast, anomalies etc
-ggplot()
+may_forecast %>%
+    merge(forecast_mean, 
+          by.x = "admin3Pcode", by.y = "adm3_pcode") %>%
+    mutate(Anomaly = Seasonal_Forecast - Seasonal_average) %>%
+    merge(eth_adm3_codab, by = "admin3Pcode", all.y = T) %>%
+    mutate(may_anomaly_jjas = case_when(
+        admin3Pcode %in% jjas_woredas$admin3Pcode ~ Anomaly, 
+        .default = NA)) %>%
+    ggplot() +
+    geom_sf(aes(fill = may_anomaly_jjas, geometry = Shape)) + 
+    scale_fill_gradient2(low = "tomato", mid = "white", 
+                         high = "#0f52ba", midpoint = 0, 
+                         na.value = "lightgrey") +
+    labs(title = "Seasonal Forecast: Rainfall Anomaly",
+         fill = "Rainfall Anomaly")
 
 ```
 
