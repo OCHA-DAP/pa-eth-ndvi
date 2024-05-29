@@ -1,6 +1,9 @@
 ---
 title: "Seasonal Bulletin"
-author: "UN OCHA Centre for Humanitarian Data"
+author: 
+  - name: "Pauline Ndirangu"
+    email: "pauline.ndirangu@un.org"
+    affliations: "UN OCHA Centre for Humanitarian Data - Data Science Team"
 date: '`r Sys.Date()`'
 toc: true
 toc-location: left
@@ -371,8 +374,8 @@ target_rainfall <- impact_forecasts %>%
     pull(Seasonal_Mean)
 
 # Calculate the 10% range
-lower_bound <- target_rainfall * 0.8
-upper_bound <- target_rainfall * 1.2
+lower_bound <- target_rainfall * 0.9
+upper_bound <- target_rainfall * 1.1
 
 # adding em_dat and cerf data
 eth_emdat <- em_dat %>%
