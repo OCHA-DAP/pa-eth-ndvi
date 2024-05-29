@@ -362,7 +362,9 @@ lower_bound <- target_rainfall * 0.9
 upper_bound <- target_rainfall * 1.1
 
 # adding em_dat and cerf data
-
+eth_emdat <- em_dat %>%
+    filter(ISO == "ETH" & `Disaster Type` == "Drought")
+    
 
 # Filter the data for years within the 10% range
 similar_years <- all_forecasts %>%
@@ -385,3 +387,7 @@ DT::datatable(similar_years, options = list(
 ```
 
 ------------------------------------------------------------------------
+
+![](images/centre_banner-01.png){fig-align="left" width="30%"}
+
+![](images/ocha_logo_wide.png){fig-align="right" width="40%"}
