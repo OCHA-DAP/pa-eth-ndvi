@@ -8,13 +8,13 @@ toc-title: "Outline"
 margin-right: 5%
 format: html
 editor: visual
-css: |
-  body, #fig-forecast {
-    overflow-x: hidden;
-  }
 ---
 
 # Ethiopia - Seasonal Outlook
+
+## Summary and Recommendations
+
+(To be filled in)
 
 ## Areas of Interest and Scale of Anomaly
 
@@ -25,7 +25,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ```
 
-```{r libraries, echo = FALSE, warning=FALSE, message=FALSE, results='hide'}
+```{r, libraries, echo = FALSE, warning=FALSE, message=FALSE, results='hide'}
 library(tidyverse)
 library(sf)
 library(arrow)
@@ -45,6 +45,18 @@ land_mask <- read_csv(
         "woreda_land_mask.csv"))
 
 # reading in admin file
+eth_adm1_codab <- st_read(
+  file.path(
+    Sys.getenv("AA_DATA_DIR"),
+    "public", "raw", "eth", "cod_ab", "Admin_2024.gdb.zip"), 
+  layer = "eth_admbnda_adm1_csa_bofedb_2024")
+
+eth_adm2_codab <- st_read(
+  file.path(
+    Sys.getenv("AA_DATA_DIR"),
+    "public", "raw", "eth", "cod_ab", "Admin_2024.gdb.zip"), 
+  layer = "eth_admbnda_adm2_csa_bofedb_2024")
+
 eth_adm3_codab <- st_read(
   file.path(
     Sys.getenv("AA_DATA_DIR"),
@@ -68,12 +80,8 @@ jjas_woredas <- eth_seasons %>%
 # reading in the lastest forecast
 may_forecast <- read_csv(
     file.path(
-        dirname(
-            dirname(
-                Sys.getenv("AA_DATA_DIR"))), 
-        "Ethiopia", 
-        "2024", 
-        "Trigger Development", 
+        dirname(getwd()),
+        "data", 
         "eth_forecast_may_2024.csv"))
 
 # reading in past re-forecast and forecast data
@@ -109,14 +117,15 @@ ave_2024 <- may_forecast %>%
 
 ```
 
-```{r fig-forecast, warning=FALSE, message=FALSE, fig.height=4}
+```{r, warning=FALSE, message=FALSE}
 #| label: fig-forecast
-#| fig-cap: "Areas of Interest"
-#| fig-subcap:
-#|   - "Kiremt-receiving woredas with their respective livelihoods"
-#|   - "Seasonal forecast by woreda" 
+#| fig-cap: 
+#|   - "Woredas with their respective livelihoods"
+#|   - "Seasonal forecast by woreda"
+#| column: page-inset-right
 #| layout-nrow: 1
-#| column: body
+#| out-width: "100%"
+
 
 # plotting woredas for JJAS
 eth_seasons %>%
@@ -126,10 +135,12 @@ eth_seasons %>%
                                       .default = land_mask)) %>%
     ggplot() +
     geom_sf(aes(fill = land_mask_jjas, geometry = Shape)) + 
+    geom_sf(data = eth_adm1_codab, fill = "transparent", color = "black", linewidth = 4) +
     scale_fill_discrete(na.translate = F) +
-    labs(title = "Woredas that have JJAS(Kiremt) season",
+    labs(title = "Woredas that receive rains during JJAS (Kiremt) season",
          fill = "Land Mask") +
-    theme(plot.margin = margin(0, 0, 0, 0, "cm"))
+    theme(plot.margin = margin(0, 0, 0, 0, "cm"), 
+          text = element_text(size = 20))
 
 # plotting forecast, anomalies etc
 may_forecast %>%
@@ -142,19 +153,212 @@ may_forecast %>%
         .default = NA)) %>%
     ggplot() +
     geom_sf(aes(fill = may_anomaly_jjas, geometry = Shape)) + 
+    geom_sf(data = eth_adm1_codab, fill = "transparent", color = "black", linewidth = 1) +
     scale_fill_gradient2(low = "tomato", mid = "white", 
                          high = "#0f52ba", midpoint = 0, 
                          na.value = "lightgrey") +
     labs(title = "Seasonal Forecast: Rainfall Anomaly",
          fill = "Rainfall Anomaly") +
-    theme(plot.margin = margin(0, 0, 0, 0, "cm"))
+    theme(plot.margin = margin(0, 0, 0, 0, "cm"),
+          text = element_text(size = 20))
 
 ```
 
-An ENSO-neutral phase and a positive IOD phase will characterise the upcoming season. This would result in
+An ENSO-neutral phase and a positive IOD phase will characterise the upcoming season. This would result in increased rainfall.
+
+------------------------------------------------------------------------
+
+## Historical Context and Rainfall Distribution
+
+What the seasonal forecast shows with respect to historical years
 
 ```{r, warning=FALSE, message=FALSE}
+#| label: fig-historical
+#| fig-cap: 
+#|   - "Seasonal rainfall over the Kiremt-receiving woredas"
+#|   - "2024 Forecast vs Rainfall Distribution"
+#| column: page-inset-right
+#| layout-nrow: 1
+#| out-width: "100%"
 
+forecast_mean %>%
+    merge(jjas_forecast, by = "adm3_pcode") %>%
+    filter(adm3_pcode %in% jjas_woredas$admin3Pcode) %>%
+    mutate(Anomaly = Seasonal_total - Seasonal_average) %>%
+    group_by(pub_year) %>%
+    summarise(country_mean = mean(Seasonal_total, na.rm=T)) %>%
+    bind_rows(ave_2024) %>%
+    mutate(cur_season = if_else(pub_year == 2024, "Yes", "No")) %>%
+    ggplot() +
+    geom_line(aes(x = pub_year, y = country_mean), color = "#0f52ba",
+              linewidth = 0.8) + 
+    geom_point(data = ave_2024, aes(x = pub_year,
+                                    y = country_mean,
+                                    color = "Yes"), size = 5) +  
+    labs(title = "Seasonal Rainfall over the years",
+         x = "Year",
+         y = "Rainfall (mm)") +
+    geom_hline(yintercept = ave_2024$country_mean, 
+               color = "tomato", linewidth = 1, 
+               linetype = "dashed") +
+    annotate("text", x = 2005, y = ave_2024$country_mean, 
+                  label = "Forecast Average", color = "black", 
+             vjust = -0.5, size = 7) +
+    annotate("text", x = 2024, y = ave_2024$country_mean, 
+             label = "2024", color = "black", 
+             vjust = -0.8, hjust = -0.1, size = 7) +
+    scale_color_manual(values = c("Yes" = "orange")) + 
+    scale_x_continuous(breaks = date_breaks(width = 5)) + 
+    xlim(1980, 2030) +
+    guides(linewidth = "none", color = "none")+
+    theme(plot.margin = margin(0, 0, 0, 0, "cm"),
+          text = element_text(size = 20))
+
+
+df <- forecast_mean %>%
+    merge(jjas_forecast, by = "adm3_pcode") %>%
+    filter(adm3_pcode %in% jjas_woredas$admin3Pcode) %>%
+    mutate(Anomaly = Seasonal_total - Seasonal_average) %>%
+    group_by(pub_year) %>%
+    summarise(country_mean = mean(Seasonal_total, na.rm=T)) %>%
+    bind_rows(ave_2024) %>%
+    mutate(cur_season = if_else(pub_year == 2024, "Yes", "No"))
+
+# Calculate percentiles
+percentiles <- quantile(df$country_mean, probs = c(0.2, 0.4, 0.6, 0.8, 1))
+
+# Bin the years according to percentiles
+df$percentile <- cut(df$country_mean, breaks = c(-Inf, percentiles), 
+                     labels = c("20%", "40%", "60%", "80%", "100%"), include.lowest = TRUE)
+
+# Aggregate years within each bin
+label_data <- df %>%
+    group_by(percentile) %>%
+    summarise(years = paste(unique(pub_year), collapse = "\n"))  # Concatenate years with newline character
+
+# Calculate midpoint of each bin
+bin_midpoints <- c(0, percentiles[-length(percentiles)] + diff(percentiles) / 2)
+
+# Ensure bin_midpoints matches the number of bins
+bin_midpoints <- bin_midpoints[1:nrow(label_data)]
+bin_midpoints[1] <- 800
+
+# Repeat the midpoint for each label
+label_data$x <- bin_midpoints
+label_data$y <- rep(0, nrow(label_data))
+
+# Plotting
+ggplot(df, aes(x = country_mean)) +
+    geom_density(fill = "skyblue", alpha = 0.6, linewidth = 1.2) +  # Increase line width
+    geom_text(data = label_data,
+              aes(label = years, x = x, y = y),  # Position text near the middle of each bin
+              hjust = 0.5, vjust = -0.2, size = 5.5, color = "black") +  # Adjust justification and size
+    geom_vline(xintercept = percentiles, linetype = "dashed", color = "red") +
+    geom_vline(xintercept = ave_2024$country_mean, color = "red", linewidth = 1.2) + # Add vertical lines at percentiles
+    labs(title = "Density Plot with Years by Percentile with 2024 highlighted",
+         y = "Density", x = "Rainfall (mm)") +
+    theme_minimal() +
+    theme(axis.text.y = element_blank(),
+          plot.margin = margin(0, 0, 0, 0, "cm"),
+          text = element_text(size = 20))  # Remove y-axis labels
+
+```
+
+### Return Period by Zone
+
+The table describes the non-exceedance probability, indicating how often a season would historically have had a value that is less than or equal to the 2024 seasonal value. For example, the East Gojam Zone in Amhara Region expects to receive on average, a season with rainfall less than or equal to 1150 mm once every 43 years, a rare event.
+
+```{r, warning=FALSE, message=FALSE}
+#| label: fig-returnperiod
+#| fig-cap: 
+#|   - "Return Periods for the 2024 forecast by Zone"
+#| column: page-inset-right
+#| layout-nrow: 1
+#| out-width: "100%"
+
+
+all_forecasts <- may_forecast %>%
+    filter(admin3Pcode %in% jjas_woredas$admin3Pcode) %>%
+    dplyr::select(admin3Pcode, Seasonal_Forecast) %>%
+    mutate(pub_year = 2024) %>%
+    bind_rows(jjas_forecast %>%
+                  ungroup() %>%
+                  dplyr::select(adm3_pcode, Seasonal_total, pub_year) %>%
+                  rename(admin3Pcode=adm3_pcode,Seasonal_Forecast=Seasonal_total)) %>%
+    mutate(admin2Pcode = substr(admin3Pcode, 1, 6)) %>%
+    group_by(admin2Pcode, pub_year) %>%
+    summarise(Zonal_Mean = round(mean(Seasonal_Forecast, na.rm = T), 2)) %>%
+    group_by(admin2Pcode) %>%
+    mutate(ecdf_values = ecdf(Zonal_Mean)(Zonal_Mean),
+           non_exceedance_probability = ecdf_values,
+           non_exceedance_probability = replace(non_exceedance_probability, non_exceedance_probability == 0, 1e-10),
+           return_period = round(1 / non_exceedance_probability, 1)) %>%
+    merge(eth_adm2_codab, by = "admin2Pcode") %>%
+    filter(pub_year == 2024) %>%
+    dplyr::select(admin2Name_en, admin1Name_en, Zonal_Mean, return_period) %>%
+    rename(`Zone Name` = admin2Name_en,
+           `Region Name` = admin1Name_en,
+           `Seasonal Forecast` = Zonal_Mean,
+           `Return Period` = return_period)
+
+DT::datatable(all_forecasts, options = list(
+    scrollX = F,    
+    scrollY = 300,     
+    pageLength = 15    
+))
+
+```
+
+------------------------------------------------------------------------
+
+## Similar years and Expected Impact
+
+```{r, warning=FALSE, message=FALSE}
+#| label: fig-impact
+#| fig-cap: 
+#|   - "Return Periods for the 2024 forecast by Zone"
+#| column: page-inset-right
+#| layout-nrow: 1
+#| out-width: "100%"
+
+all_forecasts <- may_forecast %>%
+    filter(admin3Pcode %in% jjas_woredas$admin3Pcode) %>%
+    dplyr::select(admin3Pcode, Seasonal_Forecast) %>%
+    mutate(pub_year = 2024) %>%
+    bind_rows(jjas_forecast %>%
+                  ungroup() %>%
+                  dplyr::select(adm3_pcode, Seasonal_total, pub_year) %>%
+                  rename(admin3Pcode=adm3_pcode,Seasonal_Forecast=Seasonal_total)) %>%
+    group_by(pub_year) %>%
+    summarise(Seasonal_Mean = round(mean(Seasonal_Forecast, na.rm = T), 2))
+
+# Specify the target year
+target_year <- 2024
+
+# Get the rainfall value for the target year
+target_rainfall <- all_forecasts %>% 
+    filter(pub_year == target_year) %>% 
+    pull(Seasonal_Mean)
+
+# Calculate the 10% range
+lower_bound <- target_rainfall * 0.9
+upper_bound <- target_rainfall * 1.1
+
+# Filter the data for years within the 10% range
+similar_years <- all_forecasts %>%
+    filter(Seasonal_Mean >= lower_bound & Seasonal_Mean <= upper_bound) %>%
+    mutate(
+        Difference = round(abs(Seasonal_Mean - target_rainfall), 1)
+    ) %>%
+    arrange(Difference) %>%
+    
+
+# Display the result in a scrollable datatable
+DT::datatable(similar_years, options = list(
+    scrollX = TRUE,    # Enable horizontal scrolling
+    scrollY = 300,     # Set table height to 300px and enable vertical scrolling
+    pageLength = 10    # Display 10 rows per page
+))
 
 ```
 
