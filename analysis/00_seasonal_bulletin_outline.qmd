@@ -3,7 +3,8 @@ title: "Seasonal Bulletin"
 author: 
   - name: "Pauline Ndirangu"
     email: "pauline.ndirangu@un.org"
-    affliations: "UN OCHA Centre for Humanitarian Data - Data Science Team"
+    affliations: 
+      - "UN OCHA Centre for Humanitarian Data - Data Science Team"
 date: '`r Sys.Date()`'
 toc: true
 toc-location: left
@@ -348,7 +349,7 @@ These are the years that had the closest absolute seasonal rainfall to the 2024 
 #| fig-cap: 
 #|   - "Years with Seasonal Rainfall similar to the 2024 forecast"
 #| column: page-inset-right
-#| layout-nrow: 1
+#| layout-ncol: 1
 #| out-width: "100%"
 #| #datatable {border-collapse: collapse; border-spacing: 0;}
 #| #datatable th, #datatable td {border: 1px solid #dddddd;padding: 8px;}
@@ -419,10 +420,11 @@ similar_years %>%
     ggplot(aes(x=factor(Year), y=as.numeric(`Seasonal Rainfall`))) +
     geom_bar(stat="identity", fill="#0F52BA") +
     geom_text(aes(label=(gsub(",", "", formatted_cerf))), vjust=-0.5, color="black") +
-    labs(title="Total Rainfall and CERF Allocations by Year with Drought Periods Highlighted",
+    labs(title="Total Rainfall of Similar Seasons and CERF Allocations by Year",
+         subtitle = "People affected by drought for each Drought Period",
          x="Year", y="Seasonal Rainfall (mm)") +
     scale_x_discrete(breaks = seq(1981, 2024, by = 6)) +
-    geom_rect(aes(xmin = factor(Year), xmax = `End Year`,
+    geom_rect(aes(xmin = factor(Year), xmax = factor(`End Year`),
                   ymin = 0, ymax = cleaned_emdat), fill = "tomato", alpha = 0.5) +
     geom_text(aes(x = factor(ave_drought_yr), 
                   y = cleaned_emdat,
