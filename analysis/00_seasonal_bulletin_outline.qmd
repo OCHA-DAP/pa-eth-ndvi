@@ -413,23 +413,38 @@ similar_years %>%
         cleaned_cerf = as.numeric(gsub(",", "", `Approved CERF Allocation`)) / 1000000,
         formatted_cerf = ifelse(is.na(cleaned_cerf), "", paste0(round(cleaned_cerf, 1), "M")),
         ave_drought_yr = as.integer((Year + as.integer(`End Year`) ) / 2),
-        `End Year` = factor(`End Year`),
+        `End Year` = as.integer(`End Year`),
         cleaned_emdat = as.numeric(gsub(",", "", `Total Affected`)) / 40000,
         formatted_emdat = ifelse(is.na(cleaned_emdat), "", paste0(round(cleaned_emdat*0.04, 1), "M"))
     ) %>%
-    ggplot(aes(x=factor(Year), y=as.numeric(`Seasonal Rainfall`))) +
-    geom_bar(stat="identity", fill="#0F52BA") +
+    ggplot(aes(x=Year, y=as.numeric(`Seasonal Rainfall`))) +
+    geom_bar(stat="identity", fill="#0F52BA", alpha = 0.7) +
     geom_text(aes(label=(gsub(",", "", formatted_cerf))), vjust=-0.5, color="black") +
     labs(title="Total Rainfall of Similar Seasons and CERF Allocations by Year",
-         subtitle = "People affected by drought for each Drought Period",
+         subtitle = "Secondary axis: People affected by drought for each Drought Period",
          x="Year", y="Seasonal Rainfall (mm)") +
-    scale_x_discrete(breaks = seq(1981, 2024, by = 6)) +
-    geom_rect(aes(xmin = factor(Year), xmax = factor(`End Year`),
+    scale_x_continuous(breaks = seq(1981, 2024, by = 6)) +
+    geom_rect(aes(xmin = as.integer(Year), xmax = `End Year`,
                   ymin = 0, ymax = cleaned_emdat), fill = "tomato", alpha = 0.5) +
-    geom_text(aes(x = factor(ave_drought_yr), 
+    geom_text(aes(x = as.integer(ave_drought_yr), 
                   y = cleaned_emdat,
-                  label=(gsub(",", "", formatted_emdat))), vjust=-0.5, hjust=0.2, color="black")
+                  label=(gsub(",", "", formatted_emdat))), vjust=-0.5, hjust=0.2, color="black") +
+  scale_y_continuous(
+    name = "Seasonal Rainfall (mm)", 
+    labels = comma,
+    sec.axis = sec_axis(~.*40000, name = "Total Affected", labels = comma)
+  )
 
+```
+
+```{r, warning=FALSE, message=FALSE}
+#| label: tbl-impact
+#| tbl-cap: 
+#|   - "Similar years and expected impact"
+#| column: page-inset-right
+#| layout-ncol: 1
+#| out-width: "100%"
+#| 
 
 # Display the result in a datatable
 DT::datatable(similar_years,
@@ -443,7 +458,6 @@ DT::datatable(similar_years,
                           className = 'dt-right', 
                           targets="_all")))) %>%
     formatStyle(c("Seasonal Rainfall", "Difference", "Approved CERF Allocation"), textAlign = "right")
-
 ```
 
 ------------------------------------------------------------------------
