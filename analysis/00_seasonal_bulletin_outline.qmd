@@ -322,12 +322,15 @@ all_forecasts <- may_forecast %>%
 
 DT::datatable(all_forecasts,
               rownames = F,
+              class = "compact row-border",
               options = list(
                   filter = "none",
                   dom = "tpi",
-                  class = "cell-border compact"
-              )) %>%
-    formatStyle(c("Zone Name", "Region Name", "Seasonal Forecast"), textAlign = "right")
+                  columnDefs = list(
+                      list(
+                          className = 'dt-right', 
+                          targets="_all")))) %>%
+    formatStyle(columns = c("Zone Name", "Region Name", "Seasonal Forecast"), textAlign = "right")
 
 ```
 
@@ -348,7 +351,7 @@ These are the years that had the closest absolute seasonal rainfall to the 2024 
 #| #datatable th, #datatable td {border: 1px solid #dddddd;padding: 8px;}
 #| #datatable th {background-color: #f2f2f2;}
 
-all_forecasts <- may_forecast %>%
+impact_forecasts <- may_forecast %>%
     filter(admin3Pcode %in% jjas_woredas$admin3Pcode) %>%
     dplyr::select(admin3Pcode, Seasonal_Forecast) %>%
     mutate(pub_year = 2024) %>%
@@ -363,13 +366,13 @@ all_forecasts <- may_forecast %>%
 target_year <- 2024
 
 # Get the rainfall value for the target year
-target_rainfall <- all_forecasts %>% 
+target_rainfall <- impact_forecasts %>% 
     filter(pub_year == target_year) %>% 
     pull(Seasonal_Mean)
 
 # Calculate the 10% range
-lower_bound <- target_rainfall * 0.9
-upper_bound <- target_rainfall * 1.1
+lower_bound <- target_rainfall * 0.8
+upper_bound <- target_rainfall * 1.2
 
 # adding em_dat and cerf data
 eth_emdat <- em_dat %>%
@@ -384,12 +387,10 @@ eth_cerf <- funding %>%
     mutate(Year = year(`Approval date`)) %>%
     group_by(Year) %>%
     summarise(`Approved CERF Allocation` = sum(`Approved amount in US$`, na.rm = T)) %>%
-    mutate(`Approved CERF Allocation` = format(`Approved CERF Allocation`, 
-                                          big.mark=",", 
-                                          scientific=FALSE))
+    mutate(`Approved CERF Allocation` = format(`Approved CERF Allocation`, big.mark=",", scientific=FALSE))
 
 # Filter the data for years within the 10% range
-similar_years <- all_forecasts %>%
+similar_years <- impact_forecasts %>%
     filter(Seasonal_Mean >= lower_bound & Seasonal_Mean <= upper_bound) %>%
     mutate(
         Difference = round(abs(Seasonal_Mean - target_rainfall), 1)
@@ -398,19 +399,23 @@ similar_years <- all_forecasts %>%
     rename(Year = pub_year, 
            `Seasonal Rainfall` = Seasonal_Mean) %>%
     merge(eth_cerf, by = "Year", all = TRUE, sort = FALSE) %>%
+    merge(eth_emdat, by.x = "Year", by.y = "Start Year", all = TRUE, sort = FALSE) %>%
     arrange(Difference) %>%
     # Replace NA values with empty strings
     mutate(across(everything(), ~ ifelse(is.na(.), "", .)))
     
 
-# Display the result in a scrollable datatable
+# Display the result in a datatable
 DT::datatable(similar_years,
               rownames = F,
+              class = "compact row-border",
               options = list(
                   filter = "none",
                   dom = "tpi",
-                  class = "cell-border compact"
-              )) %>%
+                  columnDefs = list(
+                      list(
+                          className = 'dt-right', 
+                          targets="_all")))) %>%
     formatStyle(c("Seasonal Rainfall", "Difference", "Approved CERF Allocation"), textAlign = "right")
 
 ```
