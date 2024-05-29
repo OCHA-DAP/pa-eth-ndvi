@@ -407,6 +407,27 @@ similar_years <- impact_forecasts %>%
     # Replace NA values with empty strings
     mutate(across(everything(), ~ ifelse(is.na(.), "", .)))
     
+similar_years %>%
+    mutate(
+        cleaned_cerf = as.numeric(gsub(",", "", `Approved CERF Allocation`)) / 1000000,
+        formatted_cerf = ifelse(is.na(cleaned_cerf), "", paste0(round(cleaned_cerf, 1), "M")),
+        ave_drought_yr = as.integer((Year + as.integer(`End Year`) ) / 2),
+        `End Year` = factor(`End Year`),
+        cleaned_emdat = as.numeric(gsub(",", "", `Total Affected`)) / 40000,
+        formatted_emdat = ifelse(is.na(cleaned_emdat), "", paste0(round(cleaned_emdat*0.04, 1), "M"))
+    ) %>%
+    ggplot(aes(x=factor(Year), y=as.numeric(`Seasonal Rainfall`))) +
+    geom_bar(stat="identity", fill="#0F52BA") +
+    geom_text(aes(label=(gsub(",", "", formatted_cerf))), vjust=-0.5, color="black") +
+    labs(title="Total Rainfall and CERF Allocations by Year with Drought Periods Highlighted",
+         x="Year", y="Seasonal Rainfall (mm)") +
+    scale_x_discrete(breaks = seq(1981, 2024, by = 6)) +
+    geom_rect(aes(xmin = factor(Year), xmax = `End Year`,
+                  ymin = 0, ymax = cleaned_emdat), fill = "tomato", alpha = 0.5) +
+    geom_text(aes(x = factor(ave_drought_yr), 
+                  y = cleaned_emdat,
+                  label=(gsub(",", "", formatted_emdat))), vjust=-0.5, hjust=0.2, color="black")
+
 
 # Display the result in a datatable
 DT::datatable(similar_years,
