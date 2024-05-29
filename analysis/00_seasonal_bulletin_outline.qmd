@@ -16,6 +16,8 @@ editor: visual
 
 (To be filled in)
 
+------------------------------------------------------------------------
+
 ## Areas of Interest and Scale of Anomaly
 
 ### Kiremt-receiving woredas
@@ -31,6 +33,7 @@ library(sf)
 library(arrow)
 library(scales)
 library(readxl)
+library(DT)
 library(gghdx)
 gghdx()
 
@@ -291,7 +294,6 @@ The table describes the non-exceedance probability, indicating how often a seaso
 #| layout-nrow: 1
 #| out-width: "100%"
 
-
 all_forecasts <- may_forecast %>%
     filter(admin3Pcode %in% jjas_woredas$admin3Pcode) %>%
     dplyr::select(admin3Pcode, Seasonal_Forecast) %>%
@@ -307,7 +309,9 @@ all_forecasts <- may_forecast %>%
     mutate(ecdf_values = ecdf(Zonal_Mean)(Zonal_Mean),
            non_exceedance_probability = ecdf_values,
            non_exceedance_probability = replace(non_exceedance_probability, non_exceedance_probability == 0, 1e-10),
-           return_period = round(1 / non_exceedance_probability, 1)) %>%
+           return_period = round(1 / non_exceedance_probability, 1),
+           Zonal_Mean = format(Zonal_Mean, big.mark=",", 
+                               scientific=FALSE)) %>%
     merge(eth_adm2_codab, by = "admin2Pcode") %>%
     filter(pub_year == 2024) %>%
     dplyr::select(admin2Name_en, admin1Name_en, Zonal_Mean, return_period) %>%
@@ -316,11 +320,14 @@ all_forecasts <- may_forecast %>%
            `Seasonal Forecast` = Zonal_Mean,
            `Return Period` = return_period)
 
-DT::datatable(all_forecasts, options = list(
-    scrollX = F,    
-    scrollY = 300,     
-    pageLength = 15    
-))
+DT::datatable(all_forecasts,
+              rownames = F,
+              options = list(
+                  filter = "none",
+                  dom = "tpi",
+                  class = "cell-border compact"
+              )) %>%
+    formatStyle(c("Zone Name", "Region Name", "Seasonal Forecast"), textAlign = "right")
 
 ```
 
@@ -337,6 +344,9 @@ These are the years that had the closest absolute seasonal rainfall to the 2024 
 #| column: page-inset-right
 #| layout-nrow: 1
 #| out-width: "100%"
+#| #datatable {border-collapse: collapse; border-spacing: 0;}
+#| #datatable th, #datatable td {border: 1px solid #dddddd;padding: 8px;}
+#| #datatable th {background-color: #f2f2f2;}
 
 all_forecasts <- may_forecast %>%
     filter(admin3Pcode %in% jjas_woredas$admin3Pcode) %>%
@@ -363,8 +373,20 @@ upper_bound <- target_rainfall * 1.1
 
 # adding em_dat and cerf data
 eth_emdat <- em_dat %>%
-    filter(ISO == "ETH" & `Disaster Type` == "Drought")
-    
+    filter(ISO == "ETH" & `Disaster Type` == "Drought") %>%
+    dplyr::select(`Start Year`, `End Year`, `Total Affected`) %>%
+    mutate(`Total Affected` = format(`Total Affected`, 
+                                          big.mark=",", 
+                                          scientific=FALSE))
+
+eth_cerf <- funding %>%
+    filter(`Emergency type` == "Drought") %>%
+    mutate(Year = year(`Approval date`)) %>%
+    group_by(Year) %>%
+    summarise(`Approved CERF Allocation` = sum(`Approved amount in US$`, na.rm = T)) %>%
+    mutate(`Approved CERF Allocation` = format(`Approved CERF Allocation`, 
+                                          big.mark=",", 
+                                          scientific=FALSE))
 
 # Filter the data for years within the 10% range
 similar_years <- all_forecasts %>%
@@ -374,20 +396,23 @@ similar_years <- all_forecasts %>%
     ) %>%
     arrange(Difference) %>%
     rename(Year = pub_year, 
-           `Seasonal Rainfall` = Seasonal_Mean)
+           `Seasonal Rainfall` = Seasonal_Mean) %>%
+    merge(eth_cerf, by = "Year", all = TRUE, sort = FALSE) %>%
+    arrange(Difference) %>%
+    # Replace NA values with empty strings
+    mutate(across(everything(), ~ ifelse(is.na(.), "", .)))
     
 
 # Display the result in a scrollable datatable
-DT::datatable(similar_years, options = list(
-    scrollX = F,    
-    scrollY = 300,     
-    pageLength = 10    
-))
+DT::datatable(similar_years,
+              rownames = F,
+              options = list(
+                  filter = "none",
+                  dom = "tpi",
+                  class = "cell-border compact"
+              )) %>%
+    formatStyle(c("Seasonal Rainfall", "Difference", "Approved CERF Allocation"), textAlign = "right")
 
 ```
 
 ------------------------------------------------------------------------
-
-![](images/centre_banner-01.png){fig-align="left" width="30%"}
-
-![](images/ocha_logo_wide.png){fig-align="right" width="40%"}
