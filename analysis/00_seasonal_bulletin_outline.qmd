@@ -30,6 +30,7 @@ library(tidyverse)
 library(sf)
 library(arrow)
 library(scales)
+library(readxl)
 library(gghdx)
 gghdx()
 
@@ -63,6 +64,8 @@ eth_adm3_codab <- st_read(
     "public", "raw", "eth", "cod_ab", "Admin_2024.gdb.zip"), 
   layer = "eth_admbnda_adm3_csa_bofedb_2024")
 
+
+
 # reading in file with seasons from ASAP
 eth_seasons <- read_csv(
     file.path(
@@ -83,6 +86,18 @@ may_forecast <- read_csv(
         dirname(getwd()),
         "data", 
         "eth_forecast_may_2024.csv"))
+# EM-DAT
+em_dat <- read_excel(
+    file.path(
+        dirname(getwd()),
+        "data", 
+        "public_emdat_custom_request.xlsx"))
+# CERF Allocations
+funding <- read_excel(
+    file.path(
+        dirname(getwd()),
+        "data", 
+        "funding_list_country.xlsx"))
 
 # reading in past re-forecast and forecast data
 # upto 2016, re-forecasts, from 2017, forecasts
@@ -135,7 +150,7 @@ eth_seasons %>%
                                       .default = land_mask)) %>%
     ggplot() +
     geom_sf(aes(fill = land_mask_jjas, geometry = Shape)) + 
-    geom_sf(data = eth_adm1_codab, fill = "transparent", color = "black", linewidth = 4) +
+    geom_sf(data = eth_adm1_codab, fill = "transparent", color = "black", linewidth = 0.5) +
     scale_fill_discrete(na.translate = F) +
     labs(title = "Woredas that receive rains during JJAS (Kiremt) season",
          fill = "Land Mask") +
@@ -153,7 +168,7 @@ may_forecast %>%
         .default = NA)) %>%
     ggplot() +
     geom_sf(aes(fill = may_anomaly_jjas, geometry = Shape)) + 
-    geom_sf(data = eth_adm1_codab, fill = "transparent", color = "black", linewidth = 1) +
+    geom_sf(data = eth_adm1_codab, fill = "transparent", color = "black", linewidth = 0.5) +
     scale_fill_gradient2(low = "tomato", mid = "white", 
                          high = "#0f52ba", midpoint = 0, 
                          na.value = "lightgrey") +
@@ -313,10 +328,12 @@ DT::datatable(all_forecasts, options = list(
 
 ## Similar years and Expected Impact
 
+These are the years that had the closest absolute seasonal rainfall to the 2024 forecast.
+
 ```{r, warning=FALSE, message=FALSE}
 #| label: fig-impact
 #| fig-cap: 
-#|   - "Return Periods for the 2024 forecast by Zone"
+#|   - "Years with Seasonal Rainfall similar to the 2024 forecast"
 #| column: page-inset-right
 #| layout-nrow: 1
 #| out-width: "100%"
@@ -344,6 +361,9 @@ target_rainfall <- all_forecasts %>%
 lower_bound <- target_rainfall * 0.9
 upper_bound <- target_rainfall * 1.1
 
+# adding em_dat and cerf data
+
+
 # Filter the data for years within the 10% range
 similar_years <- all_forecasts %>%
     filter(Seasonal_Mean >= lower_bound & Seasonal_Mean <= upper_bound) %>%
@@ -351,13 +371,15 @@ similar_years <- all_forecasts %>%
         Difference = round(abs(Seasonal_Mean - target_rainfall), 1)
     ) %>%
     arrange(Difference) %>%
+    rename(Year = pub_year, 
+           `Seasonal Rainfall` = Seasonal_Mean)
     
 
 # Display the result in a scrollable datatable
 DT::datatable(similar_years, options = list(
-    scrollX = TRUE,    # Enable horizontal scrolling
-    scrollY = 300,     # Set table height to 300px and enable vertical scrolling
-    pageLength = 10    # Display 10 rows per page
+    scrollX = F,    
+    scrollY = 300,     
+    pageLength = 10    
 ))
 
 ```
