@@ -1,10 +1,9 @@
 ---
 title: "Seasonal Bulletin"
 author: 
-  - name: "Pauline Ndirangu"
+  - name: "Pauline Ndirangu" 
     email: "pauline.ndirangu@un.org"
-    affliations: 
-      - "UN OCHA Centre for Humanitarian Data - Data Science Team"
+    url: "https://centre.humdata.org/data-science/"
 date: '`r Sys.Date()`'
 toc: true
 toc-location: left
@@ -142,8 +141,8 @@ ave_2024 <- may_forecast %>%
 ```{r, warning=FALSE, message=FALSE}
 #| label: fig-forecast
 #| fig-cap: 
-#|   - "Woredas with their respective livelihoods"
-#|   - "Seasonal forecast by woreda"
+#|   - "Woredas with their respective land cover masks as described here: https://agricultural-production-hotspots.ec.europa.eu/download.php"
+#|   - "Seasonal forecast by woreda based on the ECMWF SEAS5 forecast with a 1-month lead time"
 #| column: page-inset-right
 #| layout-nrow: 1
 #| out-width: "100%"
@@ -165,23 +164,19 @@ eth_seasons %>%
           text = element_text(size = 20))
 
 # plotting forecast, anomalies etc
-may_forecast %>%
-    merge(forecast_mean, 
-          by.x = "admin3Pcode", by.y = "adm3_pcode") %>%
-    mutate(Anomaly = Seasonal_Forecast - Seasonal_average) %>%
+eth_seasons %>%
     merge(eth_adm3_codab, by = "admin3Pcode", all.y = T) %>%
-    mutate(may_anomaly_jjas = case_when(
-        admin3Pcode %in% jjas_woredas$admin3Pcode ~ Anomaly, 
-        .default = NA)) %>%
+    merge(may_forecast, by = "admin3Pcode") %>%
+    mutate(season1_jjas = case_when(season1 != "JJAS" ~ NA,
+                                    .default = season1),
+           may_forecast_jjas = case_when(season1 != "JJAS" ~ NA,
+                                      .default = Seasonal_Forecast)) %>%
     ggplot() +
-    geom_sf(aes(fill = may_anomaly_jjas, geometry = Shape)) + 
+    geom_sf(aes(fill = may_forecast_jjas, geometry = Shape)) + 
     geom_sf(data = eth_adm1_codab, fill = "transparent", color = "black", linewidth = 0.5) +
-    scale_fill_gradient2(low = "tomato", mid = "white", 
-                         high = "#0f52ba", midpoint = 0, 
-                         na.value = "lightgrey") +
-    labs(title = "Seasonal Forecast: Rainfall Anomaly",
-         fill = "Rainfall Anomaly") +
-    theme(plot.margin = margin(0, 0, 0, 0, "cm"),
+    labs(title = "Seasonal Forecast: Total Rainfall",
+         fill = "Seasonal Precipitation (mm)") +
+    theme(plot.margin = margin(0, 0, 0, 0, "cm"), 
           text = element_text(size = 20))
 
 ```
@@ -197,8 +192,8 @@ What the seasonal forecast shows with respect to historical years
 ```{r, warning=FALSE, message=FALSE}
 #| label: fig-historical
 #| fig-cap: 
-#|   - "Seasonal rainfall over the Kiremt-receiving woredas"
-#|   - "2024 Forecast vs Rainfall Distribution"
+#|   - "ECMWF seasonal rainfall aggregated across the Kiremt-receiving woredas"
+#|   - "2024 Forecast vs Rainfall Distribution since 1981 using data from ECMWF"
 #| column: page-inset-right
 #| layout-nrow: 1
 #| out-width: "100%"
@@ -347,7 +342,7 @@ These are the years that had the closest absolute seasonal rainfall to the 2024 
 ```{r, warning=FALSE, message=FALSE}
 #| label: fig-impact
 #| fig-cap: 
-#|   - "Years with Seasonal Rainfall similar to the 2024 forecast"
+#|   - "Seasonal Rainfall with the blue columns showing the seasonal rains, the values on top of the blue columns showing the CERF allocation for the year and the red bars showing the people affected by drought during periods of drought as described in EM-DAT."
 #| column: page-inset-right
 #| layout-ncol: 1
 #| out-width: "100%"
@@ -382,7 +377,7 @@ upper_bound <- target_rainfall * 1.1
 eth_emdat <- em_dat %>%
     filter(ISO == "ETH" & `Disaster Type` == "Drought") %>%
     dplyr::select(`Start Year`, `End Year`, `Total Affected`) %>%
-    mutate(`Total Affected` = format(`Total Affected`, 
+    mutate(`People Affected` = format(`Total Affected`, 
                                           big.mark=",", 
                                           scientific=FALSE))
 
@@ -390,16 +385,15 @@ eth_cerf <- funding %>%
     filter(`Emergency type` == "Drought") %>%
     mutate(Year = year(`Approval date`)) %>%
     group_by(Year) %>%
-    summarise(`Approved CERF Allocation` = sum(`Approved amount in US$`, na.rm = T)) %>%
-    mutate(`Approved CERF Allocation` = format(`Approved CERF Allocation`, big.mark=",", scientific=FALSE))
+    summarise(`Approved CERF Allocation ($)` = sum(`Approved amount in US$`, na.rm = T)) %>%
+    mutate(`Approved CERF Allocation ($)` = format(`Approved CERF Allocation ($)`, big.mark=",", scientific=FALSE))
 
 # Filter the data for years within the 10% range
 similar_years <- impact_forecasts %>%
-    filter(Seasonal_Mean >= lower_bound & Seasonal_Mean <= upper_bound) %>%
+    mutate(similar_years = Seasonal_Mean >= lower_bound & Seasonal_Mean <= upper_bound) %>%
     mutate(
         Difference = round(abs(Seasonal_Mean - target_rainfall), 1)
     ) %>%
-    arrange(Difference) %>%
     rename(Year = pub_year, 
            `Seasonal Rainfall` = Seasonal_Mean) %>%
     merge(eth_cerf, by = "Year", all = TRUE, sort = FALSE) %>%
@@ -410,16 +404,17 @@ similar_years <- impact_forecasts %>%
     
 similar_years %>%
     mutate(
-        cleaned_cerf = as.numeric(gsub(",", "", `Approved CERF Allocation`)) / 1000000,
-        formatted_cerf = ifelse(is.na(cleaned_cerf), "", paste0(round(cleaned_cerf, 1), "M")),
+        cleaned_cerf = as.numeric(gsub(",", "", `Approved CERF Allocation ($)`)) / 1000000,
+        formatted_cerf = ifelse(is.na(cleaned_cerf), "", paste0("$",round(cleaned_cerf, 1), "M")),
         ave_drought_yr = as.integer((Year + as.integer(`End Year`) ) / 2),
         `End Year` = as.integer(`End Year`),
         cleaned_emdat = as.numeric(gsub(",", "", `Total Affected`)) / 40000,
         formatted_emdat = ifelse(is.na(cleaned_emdat), "", paste0(round(cleaned_emdat*0.04, 1), "M"))
     ) %>%
-    ggplot(aes(x=Year, y=as.numeric(`Seasonal Rainfall`))) +
-    geom_bar(stat="identity", fill="#0F52BA", alpha = 0.7) +
-    geom_text(aes(label=(gsub(",", "", formatted_cerf))), vjust=-0.5, color="black") +
+    ggplot(aes(x=Year, y=as.numeric(`Seasonal Rainfall`), alpha = similar_years)) +
+    geom_bar(stat="identity", fill="#0F52BA") +
+    scale_alpha_manual(values = c(0.3, 0.3, 0.8)) +
+    geom_text(aes(label=(gsub(",", "", formatted_cerf))), vjust=-0.5, color="black", size=3.5) +
     labs(title="Total Rainfall of Similar Seasons and CERF Allocations by Year",
          subtitle = "Secondary axis: People affected by drought for each Drought Period",
          x="Year", y="Seasonal Rainfall (mm)") +
@@ -428,19 +423,19 @@ similar_years %>%
                   ymin = 0, ymax = cleaned_emdat), fill = "tomato", alpha = 0.5) +
     geom_text(aes(x = as.integer(ave_drought_yr), 
                   y = cleaned_emdat,
-                  label=(gsub(",", "", formatted_emdat))), vjust=-0.5, hjust=0.2, color="black") +
-  scale_y_continuous(
-    name = "Seasonal Rainfall (mm)", 
-    labels = comma,
-    sec.axis = sec_axis(~.*40000, name = "Total Affected", labels = comma)
-  )
-
+                  label=(gsub(",", "", formatted_emdat))), vjust=-0.5, hjust=0.2, color="black", size=3.5) +
+    scale_y_continuous(
+        name = "Seasonal Rainfall (mm)", 
+        labels = comma,
+        sec.axis = sec_axis(~.*40000, name = "People Affected", labels = comma)
+    ) + 
+    guides(alpha = "none")
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 #| label: tbl-impact
 #| tbl-cap: 
-#|   - "Similar years and expected impact"
+#|   - "Seasons with total seasonal rainfall forecasts similar to the 2024 forecast"
 #| column: page-inset-right
 #| layout-ncol: 1
 #| out-width: "100%"
@@ -457,7 +452,7 @@ DT::datatable(similar_years,
                       list(
                           className = 'dt-right', 
                           targets="_all")))) %>%
-    formatStyle(c("Seasonal Rainfall", "Difference", "Approved CERF Allocation"), textAlign = "right")
+    formatStyle(c("Seasonal Rainfall", "Difference", "Approved CERF Allocation ($)"), textAlign = "right")
 ```
 
 ------------------------------------------------------------------------
