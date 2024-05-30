@@ -92,6 +92,12 @@ may_forecast <- read_csv(
         dirname(getwd()),
         "data", 
         "eth_forecast_may_2024.csv"))
+# reading in the lastest forecast
+may_2023_forecast <- read_csv(
+    file.path(
+        dirname(getwd()),
+        "data", 
+        "eth_forecast_may_2023.csv"))
 # EM-DAT
 em_dat <- read_excel(
     file.path(
@@ -116,7 +122,13 @@ jjas_forecast <- adm3_forecast %>%
                valid_month %in% c(6, 7, 8, 9)) %>%
     mutate(pub_year = year(pub_date)) %>%
     group_by(adm3_pcode, pub_year, pub_month) %>%
-    summarise(Seasonal_total = sum(value, na.rm = T))
+    summarise(Seasonal_total = sum(value, na.rm = T)) %>%
+    bind_rows((may_2023_forecast |>
+               mutate(pub_year = 2023, pub_month = 5,
+                      Seasonal_total = Seasonal_Forecast,
+                      adm3_pcode = admin3Pcode) |>
+              dplyr::select(adm3_pcode, pub_year, 
+                            pub_month, Seasonal_total)))
 
 # Getting the seasonal average over the years
 forecast_mean <- jjas_forecast %>%
@@ -267,7 +279,7 @@ label_data$y <- rep(0, nrow(label_data))
 # Plotting
 ggplot(df, aes(x = country_mean)) +
     geom_density(fill = "skyblue", alpha = 0.6, linewidth = 1.2) +  # Increase line width
-    geom_text(data = label_data,
+    geom_text_hdx(data = label_data,
               aes(label = years, x = x, y = y),  # Position text near the middle of each bin
               hjust = 0.5, vjust = -0.2, size = 5.5, color = "black") +  # Adjust justification and size
     geom_vline(xintercept = percentiles, linetype = "dashed", color = "red") +
@@ -283,7 +295,7 @@ ggplot(df, aes(x = country_mean)) +
 
 ### Return Period by Zone
 
-The table describes the non-exceedance probability, indicating how often a season would historically have had a value that is less than or equal to the 2024 seasonal value. For example, the East Gojam Zone in Amhara Region expects to receive on average, a season with rainfall less than or equal to 1150 mm once every 43 years, a rare event.
+The table describes the non-exceedance probability, indicating how often a season would historically have had a value that is less than or equal to the 2024 seasonal value. A more frequent return period would show that the event is not rare and the likelihood of exceeding the value is high. For example, the East Guraghe Zone in the Central Ethiopia Region expects to receive on average, a season with rainfall less than or equal to 646 mm once every 3 years.
 
 ```{r, warning=FALSE, message=FALSE}
 #| label: fig-returnperiod
@@ -343,7 +355,7 @@ These are the years that had the closest absolute seasonal rainfall to the 2024 
 #| label: fig-impact
 #| fig-cap: 
 #|   - "Seasonal Rainfall with the blue columns showing the seasonal rains, the values on top of the blue columns showing the CERF allocation for the year and the red bars showing the people affected by drought during periods of drought as described in EM-DAT."
-#| column: page-inset-right
+#| column: screen-inset-right
 #| layout-ncol: 1
 #| out-width: "100%"
 #| #datatable {border-collapse: collapse; border-spacing: 0;}
@@ -413,15 +425,15 @@ similar_years %>%
     ) %>%
     ggplot(aes(x=Year, y=as.numeric(`Seasonal Rainfall`), alpha = similar_years)) +
     geom_bar(stat="identity", fill="#0F52BA") +
-    scale_alpha_manual(values = c(0.3, 0.3, 0.8)) +
-    geom_text(aes(label=(gsub(",", "", formatted_cerf))), vjust=-0.5, color="black", size=3.5) +
+    scale_alpha_manual(values = c(0.3, 0.8)) +
+    geom_text_hdx(aes(label=(gsub(",", "", formatted_cerf))), vjust=-0.5, color="black", size=3.5) +
     labs(title="Total Rainfall of Similar Seasons and CERF Allocations by Year",
          subtitle = "Secondary axis: People affected by drought for each Drought Period",
          x="Year", y="Seasonal Rainfall (mm)") +
     scale_x_continuous(breaks = seq(1981, 2024, by = 6)) +
     geom_rect(aes(xmin = as.integer(Year), xmax = `End Year`,
                   ymin = 0, ymax = cleaned_emdat), fill = "tomato", alpha = 0.5) +
-    geom_text(aes(x = as.integer(ave_drought_yr), 
+    geom_text_hdx(aes(x = as.integer(ave_drought_yr), 
                   y = cleaned_emdat,
                   label=(gsub(",", "", formatted_emdat))), vjust=-0.5, hjust=0.2, color="black", size=3.5) +
     scale_y_continuous(
@@ -442,7 +454,9 @@ similar_years %>%
 #| 
 
 # Display the result in a datatable
-DT::datatable(similar_years,
+DT::datatable((similar_years |>
+                   select(!c(similar_years, `Total Affected`)) |>
+                   rename(`Absolute difference from 2024 season` = Difference, `Seasonal Rainfall (mm)` = `Seasonal Rainfall`, `End Year of Drought (EM-DAT)` = `End Year`)),
               rownames = F,
               class = "compact row-border",
               options = list(
@@ -452,7 +466,7 @@ DT::datatable(similar_years,
                       list(
                           className = 'dt-right', 
                           targets="_all")))) %>%
-    formatStyle(c("Seasonal Rainfall", "Difference", "Approved CERF Allocation ($)"), textAlign = "right")
+    formatStyle(c("Seasonal Rainfall (mm)", "Absolute difference from 2024 season", "Approved CERF Allocation ($)"), textAlign = "right")
 ```
 
 ------------------------------------------------------------------------
