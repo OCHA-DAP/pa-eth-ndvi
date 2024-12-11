@@ -1,6 +1,22 @@
+# Country Support Analysis for Ethiopia
 This project uses a hybrid of python and R
 
-to run python notebooks, install 
+## Directory structure
+The code in this repository is organized as follows:
+
+```shell
+
+├── analysis      # Main repository of analytical work for the AA pilot
+├── R             # Scripts needed for analysis
+├── src         # Code to run any relevant data acquisition/processing pipelines
+|
+├── .gitignore
+├── README.md
+└── requirements.txt
+
+```
+## Reproducing this analysis
+To run python notebooks, install 
 
 `pip install git+https://github.com/OCHA-DAP/pa-aa-toolbox.git@ndvi#egg=aa-toolbox`
 
